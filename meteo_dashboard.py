@@ -15,12 +15,27 @@ from datetime import datetime, time
 st.set_page_config(
     page_title="Meteorological Operations Suite",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
 # =========================================================
 # COMPACT, PROFESSIONAL STYLING
 # =========================================================
+
+
+st.markdown("""
+<style>
+.block-container {
+    padding-top: 2.4rem;
+    padding-bottom: 1rem;
+}
+
+.hero-panel {
+    margin-top: 0.8rem;
+}
+</style>
+""", unsafe_allow_html=True)
+
 st.markdown("""
 <style>
 :root {
@@ -50,14 +65,8 @@ html, body, [class*="css"] {
         var(--bg);
 }
 
-header[data-testid="stHeader"],
-div[data-testid="stToolbar"] {
-    display: none !important;
-}
 
-#MainMenu, footer {
-    visibility: hidden !important;
-}
+
 
 .block-container {
     padding-top: 1.25rem;
@@ -65,10 +74,7 @@ div[data-testid="stToolbar"] {
     max-width: 97%;
 }
 
-section[data-testid="stSidebar"] {
-    background: rgba(255,255,255,0.96);
-    border-right: 1px solid var(--line);
-}
+
 
 .main-shell {
     margin-bottom: 0.8rem;
