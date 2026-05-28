@@ -3,3 +3,10 @@ pandas
 numpy
 plotly
 openpyxl
+re
+csv
+hashlib
+io
+pathlib
+datetime
+fpdf
