@@ -8,6 +8,7 @@ import hashlib
 from io import BytesIO
 from pathlib import Path
 from datetime import datetime, time
+from fpdf import FPDF
 
 # =========================================================
 # PAGE CONFIG
@@ -19,25 +20,18 @@ st.set_page_config(
 )
 
 # =========================================================
-# COMPACT, PROFESSIONAL STYLING
+# STYLING
 # =========================================================
-
-
 st.markdown("""
 <style>
 .block-container {
     padding-top: 2.4rem;
     padding-bottom: 1rem;
+    max-width: 97%;
 }
-
 .hero-panel {
     margin-top: 0.8rem;
 }
-</style>
-""", unsafe_allow_html=True)
-
-st.markdown("""
-<style>
 :root {
     --bg: #EFF4F9;
     --surface: #FFFFFF;
@@ -53,33 +47,22 @@ st.markdown("""
     --shadow-md: 0 10px 24px rgba(15, 23, 42, 0.07);
     --radius-lg: 22px;
 }
-
 html, body, [class*="css"] {
     font-family: "Segoe UI", Arial, sans-serif;
     color: var(--text);
 }
-
 .stApp {
     background:
         linear-gradient(180deg, rgba(63,169,245,0.12) 0%, rgba(239,244,249,1) 240px),
         var(--bg);
 }
 
-
-
-
-.block-container {
-    padding-top: 1.25rem;
-    padding-bottom: 1rem;
-    max-width: 97%;
+#MainMenu, footer {
+    visibility: hidden !important;
 }
-
-
-
 .main-shell {
     margin-bottom: 0.8rem;
 }
-
 .hero-panel {
     background: linear-gradient(135deg, rgba(255,255,255,0.98) 0%, rgba(249,252,255,0.99) 100%);
     border: 1px solid rgba(217,226,236,0.95);
@@ -88,7 +71,6 @@ html, body, [class*="css"] {
     box-shadow: var(--shadow-md);
     margin-bottom: 0.75rem;
 }
-
 .hero-title {
     font-size: 1.5rem;
     font-weight: 760;
@@ -96,7 +78,6 @@ html, body, [class*="css"] {
     margin-bottom: 0.15rem;
     letter-spacing: -0.02em;
 }
-
 .hero-subtitle {
     font-size: 0.93rem;
     color: var(--muted);
@@ -104,7 +85,6 @@ html, body, [class*="css"] {
     max-width: 980px;
     margin-bottom: 0.75rem;
 }
-
 .pill {
     display: inline-block;
     padding: 6px 12px;
@@ -117,14 +97,12 @@ html, body, [class*="css"] {
     background: #FFFFFF;
     color: var(--text);
 }
-
 .section-label {
     font-size: 1rem;
     font-weight: 720;
     color: var(--title);
     margin: 0.2rem 0 0.45rem 0;
 }
-
 .subtle-note {
     background: rgba(255,255,255,0.78);
     border: 1px solid var(--line);
@@ -136,7 +114,6 @@ html, body, [class*="css"] {
     margin-bottom: 0.8rem;
     box-shadow: var(--shadow-sm);
 }
-
 .site-shell {
     background: linear-gradient(180deg, rgba(255,255,255,0.94) 0%, rgba(252,253,254,0.98) 100%);
     border: 1px solid var(--line);
@@ -145,19 +122,16 @@ html, body, [class*="css"] {
     box-shadow: var(--shadow-md);
     margin-bottom: 0.9rem;
 }
-
 .site-title {
     font-size: 1.04rem;
     font-weight: 740;
     color: var(--title);
     margin-bottom: 0.08rem;
 }
-
 .site-subtitle {
     color: var(--muted);
     font-size: 0.82rem;
 }
-
 .metric-chip {
     display: inline-block;
     padding: 4px 10px;
@@ -170,7 +144,6 @@ html, body, [class*="css"] {
     background: #FFFFFF;
     color: #334155;
 }
-
 .range-badge {
     display: inline-block;
     padding: 4px 10px;
@@ -181,7 +154,6 @@ html, body, [class*="css"] {
     font-weight: 700;
     border: 1px solid rgba(63,169,245,0.18);
 }
-
 .helper-note {
     background: #F8FBFE;
     border: 1px dashed #C8D9EA;
@@ -191,7 +163,6 @@ html, body, [class*="css"] {
     font-size: 0.82rem;
     margin: 0.25rem 0 0.7rem 0;
 }
-
 .small-panel {
     background: linear-gradient(180deg, #FFFFFF 0%, #FCFDFE 100%);
     border: 1px solid var(--line);
@@ -199,20 +170,17 @@ html, body, [class*="css"] {
     padding: 10px 12px;
     box-shadow: var(--shadow-sm);
 }
-
 .small-title {
     font-size: 0.84rem;
     font-weight: 700;
     color: var(--title);
     margin-bottom: 0.35rem;
 }
-
 .small-caption {
     color: var(--muted);
     font-size: 0.76rem;
     margin-bottom: 0.45rem;
 }
-
 div[data-testid="stMetric"] {
     background: linear-gradient(180deg, #FFFFFF 0%, #FBFCFE 100%);
     border: 1px solid var(--line);
@@ -220,17 +188,14 @@ div[data-testid="stMetric"] {
     padding: 8px 10px;
     box-shadow: var(--shadow-sm);
 }
-
 div[data-testid="stMetricLabel"] {
     color: var(--muted) !important;
     font-weight: 650 !important;
 }
-
 div[data-testid="stMetricValue"] {
     color: var(--title) !important;
     font-weight: 760 !important;
 }
-
 div[data-testid="stDataFrame"],
 div[data-testid="stExpander"] {
     border: 1px solid var(--line);
@@ -238,7 +203,6 @@ div[data-testid="stExpander"] {
     overflow: hidden;
     background: #FFFFFF;
 }
-
 .stButton > button,
 .stDownloadButton > button,
 .stFormSubmitButton > button {
@@ -249,25 +213,21 @@ div[data-testid="stExpander"] {
     font-weight: 650 !important;
     box-shadow: none !important;
 }
-
 .stFormSubmitButton > button {
     background: linear-gradient(135deg, #52B6F6 0%, #2F95DA 100%) !important;
     color: white !important;
     border-color: #52B6F6 !important;
 }
-
 div[data-testid="stRadio"] > div {
     flex-direction: row;
     gap: 8px;
 }
-
 div[data-testid="stRadio"] label {
     background: #FFFFFF;
     border: 1px solid var(--line);
     padding: 6px 10px;
     border-radius: 10px;
 }
-
 hr {
     border: none;
     border-top: 1px solid var(--line-soft);
@@ -282,9 +242,10 @@ hr {
 BASE_DIR = Path(__file__).resolve().parent if "__file__" in globals() else Path.cwd()
 UPLOAD_DIR = BASE_DIR / "data_uploads"
 PROCESSED_DIR = BASE_DIR / "processed"
+REPORT_DIR = BASE_DIR / "Meteorological Reports" / "Daily"
 LOG_FILE = BASE_DIR / "upload_log.csv"
 
-for folder in [UPLOAD_DIR, PROCESSED_DIR]:
+for folder in [UPLOAD_DIR, PROCESSED_DIR, REPORT_DIR]:
     folder.mkdir(parents=True, exist_ok=True)
 
 # =========================================================
@@ -306,7 +267,7 @@ COLOR_MAP = {
 # HELPERS
 # =========================================================
 def safe_filename(name: str) -> str:
-    return re.sub(r"[^A-Za-z0-9_.-]+", "_", name)
+    return re.sub(r"[^A-Za-z0-9_.-]+", "_", str(name))
 
 def get_file_hash(file_bytes: bytes) -> str:
     return hashlib.md5(file_bytes).hexdigest()
@@ -314,8 +275,11 @@ def get_file_hash(file_bytes: bytes) -> str:
 def append_upload_log(record: dict):
     df_new = pd.DataFrame([record])
     if LOG_FILE.exists():
-        df_old = pd.read_csv(LOG_FILE)
-        df_all = pd.concat([df_old, df_new], ignore_index=True)
+        try:
+            df_old = pd.read_csv(LOG_FILE)
+            df_all = pd.concat([df_old, df_new], ignore_index=True)
+        except Exception:
+            df_all = df_new
     else:
         df_all = df_new
     df_all.to_csv(LOG_FILE, index=False)
@@ -379,7 +343,6 @@ def parse_semicolon_table(lines):
 def wide_to_long(df, begin_col, end_col):
     id_vars = [begin_col] + ([end_col] if end_col else [])
     value_vars = [c for c in df.columns if c not in id_vars]
-
     long_df = df.melt(id_vars=id_vars, value_vars=value_vars, var_name="parameter", value_name="value")
     meta = long_df["parameter"].apply(lambda x: pd.Series(split_variable(x), index=["site", "metric", "unit"]))
     long_df = pd.concat([long_df, meta], axis=1)
@@ -446,9 +409,9 @@ def save_upload_bundle(uploaded_file, file_bytes, wide_df, long_df):
     append_upload_log({
         "upload_timestamp": ts.strftime("%Y-%m-%d %H:%M:%S"),
         "original_file_name": uploaded_file.name,
-        "saved_raw_file": raw_path.name,
-        "saved_wide_csv": wide_path.name,
-        "saved_long_csv": long_path.name,
+        "saved_raw_file": str(raw_path),
+        "saved_wide_csv": str(wide_path),
+        "saved_long_csv": str(long_path),
         "rows_wide": len(wide_df),
         "rows_long": len(long_df),
         "sites": long_df["site"].nunique(),
@@ -477,8 +440,7 @@ def get_last_n_days_df(site_df, selected_metrics, n_days):
         return df
     max_ts = df["begin"].max()
     start_ts = max_ts - pd.Timedelta(days=n_days)
-    out = df[df["begin"] >= start_ts].copy()
-    return out if not out.empty else df.copy()
+    return df[df["begin"] >= start_ts].copy()
 
 def get_custom_range_df(site_df, selected_metrics, start_dt, end_dt):
     df = get_filtered_site_metric_df(site_df, selected_metrics)
@@ -489,13 +451,14 @@ def get_custom_range_df(site_df, selected_metrics, start_dt, end_dt):
 def build_latest_table(df):
     if df.empty:
         return pd.DataFrame(columns=["metric", "unit", "latest_time", "latest_value"])
+
     latest_df = (
         df.sort_values("begin")
-          .groupby(["metric", "unit"], as_index=False)
-          .tail(1)[["metric", "unit", "begin", "value"]]
-          .rename(columns={"begin": "latest_time", "value": "latest_value"})
-          .sort_values("metric")
-          .reset_index(drop=True)
+        .groupby(["metric", "unit"], as_index=False)
+        .tail(1)[["metric", "unit", "begin", "value"]]
+        .rename(columns={"begin": "latest_time", "value": "latest_value"})
+        .sort_values("metric")
+        .reset_index(drop=True)
     )
     latest_df["latest_value"] = latest_df["latest_value"].round(2)
     return latest_df
@@ -503,12 +466,14 @@ def build_latest_table(df):
 def build_window_summary(df):
     if df.empty:
         return pd.DataFrame(columns=["metric", "unit", "avg", "min", "max", "latest_time"])
+
     summary_df = (
         df.groupby(["metric", "unit"], as_index=False)
-          .agg(avg=("value", "mean"), min=("value", "min"), max=("value", "max"), latest_time=("begin", "max"))
-          .sort_values("metric")
-          .reset_index(drop=True)
+        .agg(avg=("value", "mean"), min=("value", "min"), max=("value", "max"), latest_time=("begin", "max"))
+        .sort_values("metric")
+        .reset_index(drop=True)
     )
+
     for col in ["avg", "min", "max"]:
         summary_df[col] = summary_df[col].round(2)
     return summary_df
@@ -587,7 +552,14 @@ def make_metric_summary(df_metric):
 
     summary = (
         df_metric.groupby("site", as_index=False)
-        .agg(count=("value", "count"), avg=("value", "mean"), min=("value", "min"), max=("value", "max"), std=("value", "std"), total=("value", "sum"))
+        .agg(
+            count=("value", "count"),
+            avg=("value", "mean"),
+            min=("value", "min"),
+            max=("value", "max"),
+            std=("value", "std"),
+            total=("value", "sum")
+        )
     )
 
     latest = (
@@ -600,6 +572,7 @@ def make_metric_summary(df_metric):
     summary = summary.merge(latest, on="site", how="left")
     for col in ["avg", "min", "max", "std", "total", "latest_value"]:
         summary[col] = summary[col].round(2)
+
     return summary.sort_values("avg", ascending=False).reset_index(drop=True)
 
 def build_insights(df_metric, metric_name, unit):
@@ -627,75 +600,114 @@ def build_insights(df_metric, metric_name, unit):
 
     return insights
 
-def build_excel_report(filtered_long, summary_tables):
-    output = BytesIO()
-    detail_df = filtered_long.copy()
-    if "begin" in detail_df.columns:
-        detail_df["begin"] = detail_df["begin"].astype(str)
-    if "end" in detail_df.columns:
-        detail_df["end"] = detail_df["end"].astype(str)
+def add_chart_page(pdf, page_title, image_path, source_file_name, selected_metrics, scale_mode):
+    pdf.add_page()
+    pdf.set_font("Helvetica", style="B", size=13)
+    pdf.cell(0, 8, page_title, ln=True)
+    pdf.set_font("Helvetica", size=9)
+    pdf.cell(0, 5, f"Source file: {source_file_name}", ln=True)
+    pdf.cell(0, 5, f"Metrics: {', '.join(selected_metrics)}", ln=True)
+    pdf.cell(0, 5, f"Scale mode: {scale_mode}", ln=True)
+    pdf.cell(0, 5, f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", ln=True)
+    pdf.ln(3)
+    pdf.image(str(image_path), x=10, y=pdf.get_y(), w=190)
 
-    daily = filtered_long.copy()
-    daily["date"] = daily["begin"].dt.date
+def add_no_data_page(pdf, page_title, source_file_name, selected_metrics, scale_mode):
+    pdf.add_page()
+    pdf.set_font("Helvetica", style="B", size=13)
+    pdf.cell(0, 8, page_title, ln=True)
+    pdf.set_font("Helvetica", size=9)
+    pdf.cell(0, 5, f"Source file: {source_file_name}", ln=True)
+    pdf.cell(0, 5, f"Metrics: {', '.join(selected_metrics)}", ln=True)
+    pdf.cell(0, 5, f"Scale mode: {scale_mode}", ln=True)
+    pdf.ln(8)
+    pdf.multi_cell(0, 6, "No data available for this chart window.")
 
-    daily_summary = (
-        daily.groupby(["date", "site", "metric"], as_index=False)
-        .agg(count=("value", "count"), avg=("value", "mean"), min=("value", "min"), max=("value", "max"), total=("value", "sum"))
+def build_site_pdf_report_bytes(site_name, site_df, selected_metrics, scale_mode, source_file_name, report_timestamp):
+    safe_site = safe_filename(site_name)
+    temp_dir = REPORT_DIR / "_temp_images"
+    temp_dir.mkdir(parents=True, exist_ok=True)
+
+    chart_15_df = get_last_n_days_df(site_df, selected_metrics, 15)
+    chart_2_df = get_last_n_days_df(site_df, selected_metrics, 2)
+
+    fig_15 = build_combined_chart(
+        df=chart_15_df,
+        site_name=site_name,
+        scale_mode=scale_mode,
+        chart_id=f"{safe_site}_pdf_15_{report_timestamp}",
+        title_suffix="Last 15 Days"
     )
-    for col in ["avg", "min", "max", "total"]:
-        daily_summary[col] = daily_summary[col].round(2)
+    fig_2 = build_combined_chart(
+        df=chart_2_df,
+        site_name=site_name,
+        scale_mode=scale_mode,
+        chart_id=f"{safe_site}_pdf_2_{report_timestamp}",
+        title_suffix="Last 2 Days"
+    )
 
-    with pd.ExcelWriter(output, engine="openpyxl") as writer:
-        detail_df.to_excel(writer, index=False, sheet_name="Filtered_Data")
-        daily_summary.to_excel(writer, index=False, sheet_name="Daily_Summary")
-        for metric_name, df_summary in summary_tables.items():
-            sheet_name = re.sub(r"[^A-Za-z0-9_]", "_", metric_name)[:31]
-            df_summary.to_excel(writer, index=False, sheet_name=sheet_name)
+    img_15_path = temp_dir / f"{safe_site}_{report_timestamp}_15day.png"
+    img_2_path = temp_dir / f"{safe_site}_{report_timestamp}_2day.png"
+    created_images = []
 
-    output.seek(0)
-    return output
+    try:
+        if fig_15 is not None:
+            fig_15.write_image(str(img_15_path), format="png", width=1600, height=900)
+            created_images.append(img_15_path)
 
-def build_report_text(file_name, filtered_df, selected_metrics, summary_tables):
-    if filtered_df.empty:
-        return "No data available."
+        if fig_2 is not None:
+            fig_2.write_image(str(img_2_path), format="png", width=1600, height=900)
+            created_images.append(img_2_path)
 
-    lines = [
-        "Meteorological Insights Report",
-        "=" * 32,
-        f"Source file: {file_name}",
-        f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-        f"Metrics selected: {', '.join(selected_metrics)}",
-        f"Sites covered: {filtered_df['site'].nunique()}",
-        f"Records analyzed: {len(filtered_df)}",
-        f"Time range: {filtered_df['begin'].min()} to {filtered_df['begin'].max()}",
-        ""
-    ]
+        pdf = FPDF()
+        pdf.set_auto_page_break(auto=True, margin=10)
 
-    for metric in selected_metrics:
-        metric_df = filtered_df[filtered_df["metric"] == metric].copy()
-        if metric_df.empty:
-            continue
+        if img_15_path.exists():
+            add_chart_page(
+                pdf=pdf,
+                page_title=f"{site_name} | Last 15 Days",
+                image_path=img_15_path,
+                source_file_name=source_file_name,
+                selected_metrics=selected_metrics,
+                scale_mode=scale_mode
+            )
+        else:
+            add_no_data_page(
+                pdf=pdf,
+                page_title=f"{site_name} | Last 15 Days",
+                source_file_name=source_file_name,
+                selected_metrics=selected_metrics,
+                scale_mode=scale_mode
+            )
 
-        unit = ""
-        unit_mode = metric_df["unit"].dropna().astype(str).mode()
-        if len(unit_mode) > 0:
-            unit = unit_mode.iloc[0]
+        if img_2_path.exists():
+            add_chart_page(
+                pdf=pdf,
+                page_title=f"{site_name} | Last 2 Days",
+                image_path=img_2_path,
+                source_file_name=source_file_name,
+                selected_metrics=selected_metrics,
+                scale_mode=scale_mode
+            )
+        else:
+            add_no_data_page(
+                pdf=pdf,
+                page_title=f"{site_name} | Last 2 Days",
+                source_file_name=source_file_name,
+                selected_metrics=selected_metrics,
+                scale_mode=scale_mode
+            )
 
-        lines.append(metric)
-        lines.append("-" * len(metric))
+        result = pdf.output(dest="S")
+        return result if isinstance(result, (bytes, bytearray)) else result.encode("latin1")
 
-        insights = build_insights(metric_df, metric, unit)
-        for i, item in enumerate(insights, start=1):
-            lines.append(f"{i}. {item}")
-        lines.append("")
-
-        if metric in summary_tables and not summary_tables[metric].empty:
-            lines.append("Site summary:")
-            for _, row in summary_tables[metric].iterrows():
-                lines.append(f"- {row['site']}: avg={row['avg']}, min={row['min']}, max={row['max']}, latest={row['latest_value']}")
-            lines.append("")
-
-    return "\n".join(lines)
+    finally:
+        for image_path in created_images:
+            if image_path.exists():
+                try:
+                    image_path.unlink()
+                except Exception:
+                    pass
 
 # =========================================================
 # STATE
@@ -714,6 +726,7 @@ def init_dashboard_state(current_hash, sites, metrics):
             "report_sites": sites
         }
         st.session_state["site_view_state"] = {}
+        st.session_state["generated_site_pdfs"] = []
 
     st.session_state.setdefault("applied_filters", {
         "scale_mode": "Normalized (0-100)",
@@ -722,6 +735,7 @@ def init_dashboard_state(current_hash, sites, metrics):
         "report_sites": sites
     })
     st.session_state.setdefault("site_view_state", {})
+    st.session_state.setdefault("generated_site_pdfs", [])
 
 def ensure_site_state(site, site_min, site_max):
     if site not in st.session_state["site_view_state"]:
@@ -747,7 +761,7 @@ st.markdown("""
         <span class="pill">Compact UI</span>
         <span class="pill">Instant 15/2 Day</span>
         <span class="pill">Custom Range View</span>
-        <span class="pill">Legend Below Chart</span>
+        <span class="pill">Per-Site PDF Reports</span>
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -766,7 +780,11 @@ if uploaded_file is None:
     if show_upload_history:
         log_df = load_upload_log()
         if not log_df.empty:
-            st.dataframe(log_df.sort_values("upload_timestamp", ascending=False).head(10), use_container_width=True, hide_index=True)
+            st.dataframe(
+                log_df.sort_values("upload_timestamp", ascending=False).head(10),
+                use_container_width=True,
+                hide_index=True
+            )
     st.stop()
 
 # =========================================================
@@ -789,14 +807,12 @@ if st.session_state.get("last_saved_hash") != current_hash:
 
 sites = sorted(long_df["site"].dropna().unique().tolist())
 metrics = sorted(long_df["metric"].dropna().unique().tolist())
-min_ts = long_df["begin"].min()
-max_ts = long_df["begin"].max()
 
 init_dashboard_state(current_hash, sites, metrics)
 applied = st.session_state["applied_filters"]
 
 # =========================================================
-# STAGED DASHBOARD FILTERS
+# FILTERS
 # =========================================================
 st.sidebar.markdown("### Analysis Controls")
 with st.sidebar.form("dashboard_filter_form"):
@@ -845,18 +861,35 @@ filtered_long = long_df[
     (long_df["metric"].isin(selected_metrics))
 ].copy()
 
+summary_tables = {}
+
+if show_summary_tables and selected_metrics:
+    st.markdown('<div class="section-label">Metric Summaries</div>', unsafe_allow_html=True)
+    for metric in selected_metrics:
+        metric_df = filtered_long[filtered_long["metric"] == metric].copy()
+        if metric_df.empty:
+            continue
+
+        unit_mode = metric_df["unit"].dropna().astype(str).mode()
+        unit = unit_mode.iloc[0] if len(unit_mode) > 0 else ""
+        summary_df = make_metric_summary(metric_df)
+        summary_tables[metric] = summary_df
+
+        insights = build_insights(metric_df, metric, unit)
+        with st.expander(f"{metric} summary", expanded=False):
+            for item in insights:
+                st.write(f"- {item}")
+            st.dataframe(summary_df, use_container_width=True, hide_index=True)
+
 # =========================================================
-# TOP SUMMARY
+# TOP NOTE
 # =========================================================
-st.markdown(
-    """
-    <div class="subtle-note">
-        Apply filters from the sidebar, then use <b>View Dashboard</b>. For each site, 15 Day and 2 Day update instantly;
-        Custom Range uses a dedicated button.
-    </div>
-    """,
-    unsafe_allow_html=True
-)
+st.markdown("""
+<div class="subtle-note">
+Apply filters from the sidebar, then use <b>View Dashboard</b>. Each site card supports 15 Day, 2 Day, and Custom views.
+The PDF generator creates one PDF per selected report site and includes exactly two charts per PDF: 15 Day and 2 Day.
+</div>
+""", unsafe_allow_html=True)
 
 st.markdown('<div class="section-label">Site Analysis</div>', unsafe_allow_html=True)
 
@@ -881,14 +914,11 @@ else:
         chips_html = "".join([f'<span class="metric-chip">{m}</span>' for m in metrics_present])
 
         st.markdown('<div class="site-shell">', unsafe_allow_html=True)
-        st.markdown(
-            f"""
+        st.markdown(f"""
             <div class="site-title">{site}</div>
             <div class="site-subtitle">Available range: {str(site_min)[:16] if pd.notna(site_min) else "-"} to {str(site_max)[:16] if pd.notna(site_max) else "-"}</div>
             <div style="margin-top:4px;">{chips_html}</div>
-            """,
-            unsafe_allow_html=True
-        )
+        """, unsafe_allow_html=True)
 
         current_mode = st.radio(
             "View range",
@@ -900,7 +930,10 @@ else:
         )
         site_state["mode"] = current_mode
 
-        st.markdown(f'<div style="margin:6px 0 10px 0;"><span class="range-badge">Current View: {site_state["mode"]}</span></div>', unsafe_allow_html=True)
+        st.markdown(
+            f'<div style="margin:6px 0 10px 0;"><span class="range-badge">Current View: {site_state["mode"]}</span></div>',
+            unsafe_allow_html=True
+        )
 
         if current_mode == "Custom":
             st.markdown('<div class="helper-note">Choose dates and time, then click <b>View Custom Range</b>.</div>', unsafe_allow_html=True)
@@ -968,7 +1001,7 @@ else:
         )
 
         if fig is not None:
-            st.plotly_chart(fig, use_container_width=True, key=f"plot_{safe_site}", config={"displaylogo": False, "responsive": True})
+            st.plotly_chart(fig, use_container_width=True, config={"displaylogo": False, "responsive": True})
         else:
             st.info("No data available for the current site view.")
 
@@ -981,6 +1014,7 @@ else:
                 st.caption("No latest values available for this view.")
             else:
                 st.dataframe(latest_df, use_container_width=True, hide_index=True)
+
         with tab2:
             if summary_df.empty:
                 st.caption("No summary available for this view.")
@@ -990,64 +1024,87 @@ else:
         st.markdown("</div>", unsafe_allow_html=True)
 
 # =========================================================
-# OPTIONAL METRIC SUMMARIES
+# GENERATE SITE PDFS
 # =========================================================
-summary_tables = {}
+st.markdown('<div class="section-label">Generate Site PDFs</div>', unsafe_allow_html=True)
 
-if show_summary_tables and selected_metrics:
-    st.markdown('<div class="section-label">Metric Summaries</div>', unsafe_allow_html=True)
-    for metric in selected_metrics:
-        metric_df = filtered_long[filtered_long["metric"] == metric].copy()
-        if metric_df.empty:
-            continue
+if st.button("Generate Site PDF Reports"):
+    if not selected_metrics:
+        st.warning("Please select at least one parameter before generating PDFs.")
+    elif not selected_sites_for_reports:
+        st.warning("Please select at least one report site before generating PDFs.")
+    else:
+        generated_reports = []
+        report_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-        unit = ""
-        unit_mode = metric_df["unit"].dropna().astype(str).mode()
-        if len(unit_mode) > 0:
-            unit = unit_mode.iloc[0]
+        with st.spinner("Generating site PDF reports..."):
+            for site in selected_sites_for_reports:
+                site_df = long_df[
+                    (long_df["site"] == site) &
+                    (long_df["metric"].isin(selected_metrics))
+                ].copy()
 
-        summary_df = make_metric_summary(metric_df)
-        summary_tables[metric] = summary_df
-        insights = build_insights(metric_df, metric, unit)
+                if site_df.empty:
+                    continue
 
-        with st.expander(f"{metric} summary", expanded=False):
-            if insights:
-                for item in insights:
-                    st.write(f"- {item}")
-            st.dataframe(summary_df, use_container_width=True, hide_index=True)
+                try:
+                    pdf_bytes = build_site_pdf_report_bytes(
+                        site_name=site,
+                        site_df=site_df,
+                        selected_metrics=selected_metrics,
+                        scale_mode=scale_mode,
+                        source_file_name=uploaded_file.name,
+                        report_timestamp=report_timestamp
+                    )
+
+                    pdf_name = f"{safe_filename(site)}_{report_timestamp}.pdf"
+                    pdf_path = REPORT_DIR / pdf_name
+
+                    with open(pdf_path, "wb") as f:
+                        f.write(pdf_bytes)
+
+                    generated_reports.append({
+                        "site": site,
+                        "file_name": pdf_name,
+                        "path": str(pdf_path),
+                        "bytes": pdf_bytes
+                    })
+
+                except Exception as e:
+                    st.error(f"Could not generate PDF for {site}: {e}")
+
+        st.session_state["generated_site_pdfs"] = generated_reports
+
+        if generated_reports:
+            st.success(f"Generated {len(generated_reports)} site PDF report(s) in: {REPORT_DIR}")
+        else:
+            st.warning("No site PDFs were generated.")
 
 # =========================================================
-# DOWNLOADS
+# PDF DOWNLOADS
 # =========================================================
-report_text = build_report_text(
-    file_name=uploaded_file.name,
-    filtered_df=filtered_long,
-    selected_metrics=selected_metrics,
-    summary_tables=summary_tables
-)
-excel_report = build_excel_report(filtered_long, summary_tables)
+generated_site_pdfs = st.session_state.get("generated_site_pdfs", [])
 
-st.markdown('<div class="section-label">Downloads</div>', unsafe_allow_html=True)
-d1, d2 = st.columns(2)
-with d1:
-    st.download_button(
-        "Download Text Report",
-        data=report_text,
-        file_name=f"meteo_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
-        mime="text/plain",
-        use_container_width=True
-    )
-with d2:
-    st.download_button(
-        "Download Excel Report",
-        data=excel_report.getvalue(),
-        file_name=f"meteo_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        use_container_width=True
-    )
+if generated_site_pdfs:
+    st.markdown('<div class="section-label">PDF Downloads</div>', unsafe_allow_html=True)
+
+    for report in generated_site_pdfs:
+        c1, c2 = st.columns([2.4, 1])
+        with c1:
+            st.write(f"{report['site']}")
+            st.caption(report["path"])
+        with c2:
+            st.download_button(
+                label=f"Download {report['site']} PDF",
+                data=report["bytes"],
+                file_name=report["file_name"],
+                mime="application/pdf",
+                key=f"download_{safe_filename(report['site'])}_{report['file_name']}",
+                use_container_width=True
+            )
 
 # =========================================================
-# OPTIONAL RAW DATA / LOGS
+# OPTIONAL DATA VIEWS
 # =========================================================
 if show_raw:
     st.markdown('<div class="section-label">Processed Raw Data</div>', unsafe_allow_html=True)
@@ -1057,4 +1114,8 @@ if show_upload_history:
     log_df = load_upload_log()
     if not log_df.empty:
         st.markdown('<div class="section-label">Upload History</div>', unsafe_allow_html=True)
-        st.dataframe(log_df.sort_values("upload_timestamp", ascending=False).head(20), use_container_width=True, hide_index=True)
+        st.dataframe(
+            log_df.sort_values("upload_timestamp", ascending=False).head(20),
+            use_container_width=True,
+            hide_index=True
+        )
