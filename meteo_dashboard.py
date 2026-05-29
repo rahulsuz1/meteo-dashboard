@@ -9,6 +9,8 @@ from io import BytesIO
 from pathlib import Path
 from datetime import datetime, time
 from fpdf import FPDF
+import smtplib
+from email.message import EmailMessage
 
 # =========================================================
 # PAGE CONFIG
@@ -266,6 +268,23 @@ COLOR_MAP = {
 # =========================================================
 # HELPERS
 # =========================================================
+def send_test_email_outlook(to_email):
+    sender = st.secrets["OUTLOOK_SENDER"]
+    password = st.secrets["OUTLOOK_PASSWORD"]
+
+    msg = EmailMessage()
+    msg["Subject"] = "Test email from Meteorological Dashboard"
+    msg["From"] = sender
+    msg["To"] = to_email
+    msg.set_content("This is a test email sent from your hosted Streamlit app.")
+
+    with smtplib.SMTP("smtp-mail.outlook.com", 587) as server:
+        server.ehlo()
+        server.starttls()
+        server.ehlo()
+        server.login(sender, password)
+        server.send_message(msg)
+
 def safe_filename(name: str) -> str:
     return re.sub(r"[^A-Za-z0-9_.-]+", "_", str(name))
 
@@ -1102,6 +1121,21 @@ if generated_site_pdfs:
                 key=f"download_{safe_filename(report['site'])}_{report['file_name']}",
                 use_container_width=True
             )
+
+st.markdown("### Email Test")
+
+test_email_to = st.text_input("Send test email to", value="")
+
+if st.button("Send Test Email"):
+    if not test_email_to.strip():
+        st.warning("Please enter a recipient email address.")
+    else:
+        try:
+            send_test_email_outlook(test_email_to.strip())
+            st.success(f"Test email sent to {test_email_to.strip()}")
+        except Exception as e:
+            st.error(f"Email failed: {e}")
+
 
 # =========================================================
 # OPTIONAL DATA VIEWS
