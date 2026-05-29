@@ -1113,14 +1113,19 @@ if generated_site_pdfs:
             st.write(f"{report['site']}")
             st.caption(report["path"])
         with c2:
-            st.download_button(
-                label=f"Download {report['site']} PDF",
-                data=report["bytes"],
-                file_name=report["file_name"],
-                mime="application/pdf",
-                key=f"download_{safe_filename(report['site'])}_{report['file_name']}",
-                use_container_width=True
-            )
+            pdf_path = report["path"]
+
+        with open(pdf_path, "rb") as pdf_file:
+            pdf_data = pdf_file.read()
+        
+        st.download_button(
+            label=f"Download {report['site']} PDF",
+            data=pdf_data,
+            file_name=report["file_name"],
+            mime="application/pdf",
+            key=f"download_{safe_filename(report['site'])}_{report['file_name']}",
+            use_container_width=True
+        )
 
 st.markdown("### Email Test")
 
