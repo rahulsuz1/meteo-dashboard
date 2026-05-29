@@ -1086,7 +1086,6 @@ if st.button("Generate Site PDF Reports"):
                         "site": site,
                         "file_name": pdf_name,
                         "path": str(pdf_path),
-                        "bytes": pdf_bytes
                     })
 
                 except Exception as e:
