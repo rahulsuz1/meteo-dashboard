@@ -278,12 +278,12 @@ def send_test_email_outlook(to_email):
     msg["To"] = to_email
     msg.set_content("This is a test email sent from your hosted Streamlit app.")
 
-with smtplib.SMTP("smtp.gmail.com", 587) as server:
-    server.ehlo()
-    server.starttls()
-    server.ehlo()
-    server.login(sender, password)
-    server.send_message(msg)
+    with smtplib.SMTP("smtp.gmail.com", 587) as server:
+        server.ehlo()
+        server.starttls()
+        server.ehlo()
+        server.login(sender, password)
+        server.send_message(msg)
 
 def safe_filename(name: str) -> str:
     return re.sub(r"[^A-Za-z0-9_.-]+", "_", str(name))
