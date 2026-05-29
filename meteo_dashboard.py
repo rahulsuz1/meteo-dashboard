@@ -12,6 +12,20 @@ from fpdf import FPDF
 import smtplib
 from email.message import EmailMessage
 
+class ReportPDF(FPDF):
+    def footer(self):
+        self.set_y(-12)
+        self.set_font("Helvetica", size=8)
+        self.set_text_color(120, 120, 120)
+        self.cell(
+            0,
+            6,
+            "Developed by : Dhruv Pathak and Rahul Singh",
+            0,
+            0,
+            "R"
+        )
+
 # =========================================================
 # PAGE CONFIG
 # =========================================================
@@ -20,6 +34,31 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed"
 )
+
+
+st.markdown("""
+<style>
+.dev-credit {
+    position: fixed;
+    right: 18px;
+    bottom: 14px;
+    z-index: 9999;
+    background: rgba(255, 255, 255, 0.88);
+    color: #4B5563;
+    padding: 6px 10px;
+    border-radius: 10px;
+    font-size: 12px;
+    border: 1px solid #D9E2EC;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    backdrop-filter: blur(6px);
+}
+</style>
+
+<div class="dev-credit">
+    Developed by : Dhruv Pathak and Rahul Singh
+</div>
+""", unsafe_allow_html=True)
+
 
 # =========================================================
 # STYLING
@@ -268,15 +307,30 @@ COLOR_MAP = {
 # =========================================================
 # HELPERS
 # =========================================================
-def send_test_email_gmail(to_email):
+
+def send_reports_email_gmail(to_emails, subject, body, reports):
     sender = st.secrets["EMAIL_SENDER"]
     password = st.secrets["EMAIL_PASSWORD"]
 
     msg = EmailMessage()
-    msg["Subject"] = "Test email from Meteorological Dashboard"
+    msg["Subject"] = subject
     msg["From"] = sender
-    msg["To"] = to_email
-    msg.set_content("This is a test email sent from your hosted Streamlit app.")
+    msg["To"] = ", ".join(to_emails)
+    msg.set_content(body)
+
+    for report in reports:
+        pdf_path = report["path"]
+        file_name = report["file_name"]
+
+        with open(pdf_path, "rb") as f:
+            pdf_data = f.read()
+
+        msg.add_attachment(
+            pdf_data,
+            maintype="application",
+            subtype="pdf",
+            filename=file_name
+        )
 
     with smtplib.SMTP("smtp.gmail.com", 587) as server:
         server.ehlo()
@@ -678,7 +732,7 @@ def build_site_pdf_report_bytes(site_name, site_df, selected_metrics, scale_mode
             fig_2.write_image(str(img_2_path), format="png", width=1600, height=900)
             created_images.append(img_2_path)
 
-        pdf = FPDF()
+        pdf = ReportPDF()
         pdf.set_auto_page_break(auto=True, margin=10)
 
         if img_15_path.exists():
@@ -1126,19 +1180,42 @@ if generated_site_pdfs:
             use_container_width=True
         )
 
-st.markdown("### Email Test")
+st.markdown("### Email Reports")
 
-test_email_to = st.text_input("Send test email to", value="")
+email_recipients_input = st.text_area(
+    "Recipient emails (comma separated)",
+    value=""
+)
 
-if st.button("Send Test Email"):
-    if not test_email_to.strip():
-        st.warning("Please enter a recipient email address.")
+email_subject = st.text_input(
+    "Email subject",
+    value="Meteorological Site Reports"
+)
+
+email_body = st.text_area(
+    "Email body",
+    value="Please find attached the generated meteorological site PDF reports."
+)
+
+if st.button("Send Email With All Reports"):
+    if not generated_site_pdfs:
+        st.warning("No generated reports available to email.")
     else:
-        try:
-            send_test_email_gmail(test_email_to.strip())
-            st.success(f"Test email sent to {test_email_to.strip()}")
-        except Exception as e:
-            st.error(f"Email failed: {e}")
+        to_emails = [e.strip() for e in email_recipients_input.split(",") if e.strip()]
+
+        if not to_emails:
+            st.warning("Please enter at least one recipient email.")
+        else:
+            try:
+                send_reports_email_gmail(
+                    to_emails=to_emails,
+                    subject=email_subject,
+                    body=email_body,
+                    reports=generated_site_pdfs
+                )
+                st.success("Email sent successfully with all attached reports.")
+            except Exception as e:
+                st.error(f"Email failed: {e}")
 
 
 # =========================================================
