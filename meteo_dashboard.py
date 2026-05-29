@@ -268,9 +268,9 @@ COLOR_MAP = {
 # =========================================================
 # HELPERS
 # =========================================================
-def send_test_email_outlook(to_email):
-    sender = st.secrets["OUTLOOK_SENDER"]
-    password = st.secrets["OUTLOOK_PASSWORD"]
+def send_test_email_gmail(to_email):
+    sender = st.secrets["EMAIL_SENDER"]
+    password = st.secrets["EMAIL_PASSWORD"]
 
     msg = EmailMessage()
     msg["Subject"] = "Test email from Meteorological Dashboard"
@@ -1135,7 +1135,7 @@ if st.button("Send Test Email"):
         st.warning("Please enter a recipient email address.")
     else:
         try:
-            send_test_email_outlook(test_email_to.strip())
+            send_test_email_gmail(test_email_to.strip())
             st.success(f"Test email sent to {test_email_to.strip()}")
         except Exception as e:
             st.error(f"Email failed: {e}")
