@@ -834,7 +834,7 @@ def add_installation_insight_block(pdf, site_view_df):
     ]
 
     for line in note_lines:
-        pdf.multi_cell(box_w - 6, 4, f"- {line}")
+        pdf.multi_cell(box_w - 6, 3.2, f"- {line}")
 
     pdf.set_text_color(0, 0, 0)
     pdf.set_y(start_y + box_h + 2)
