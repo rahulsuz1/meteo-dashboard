@@ -551,6 +551,295 @@ def build_window_summary(df):
         summary_df[col] = summary_df[col].round(2)
     return summary_df
 
+def installation_status_from_row(row):
+    if row["wind_avg"] <= 8.0 and row["wind_max"] <= 10.0 and row["rain_total"] <= 1.0:
+        return "Good Window"
+    if row["wind_avg"] <= 10.0 and row["wind_max"] <= 12.0 and row["rain_total"] <= 5.0:
+        return "Caution Window"
+    return "Avoid Window"
+
+
+def installation_status_color(status):
+    if status == "Good Window":
+        return (46, 204, 113)   # green
+    if status == "Caution Window":
+        return (241, 196, 15)   # amber
+    return (231, 76, 60)        # red
+
+
+def installation_status_text_color(status):
+    if status == "Caution Window":
+        return (70, 60, 0)
+    return (255, 255, 255)
+
+
+def overall_installation_status(score):
+    if score >= 70:
+        return "Good Window"
+    if score >= 45:
+        return "Caution Window"
+    return "Avoid Window"
+
+
+def build_installation_daily_table(site_view_df):
+    if site_view_df.empty:
+        return pd.DataFrame()
+
+    df = site_view_df.copy()
+    df["metric"] = df["metric"].astype(str).str.strip()
+    df["date"] = pd.to_datetime(df["begin"]).dt.date
+
+    wind_df = df[df["metric"].str.lower() == "wind speed"].copy()
+    if wind_df.empty:
+        return pd.DataFrame()
+
+    rain_df = df[df["metric"].str.lower() == "precipitation"].copy()
+
+    wind_unit_mode = wind_df["unit"].dropna().astype(str).mode()
+    wind_unit = wind_unit_mode.iloc[0] if len(wind_unit_mode) > 0 else ""
+
+    rain_unit_mode = rain_df["unit"].dropna().astype(str).mode()
+    rain_unit = rain_unit_mode.iloc[0] if len(rain_unit_mode) > 0 else ""
+
+    daily = (
+        wind_df.groupby("date", as_index=False)
+        .agg(
+            wind_avg=("value", "mean"),
+            wind_max=("value", "max"),
+            wind_min=("value", "min"),
+            wind_std=("value", "std"),
+            obs=("value", "count")
+        )
+    )
+
+    if not rain_df.empty:
+        rain_daily = rain_df.groupby("date", as_index=False).agg(
+            rain_total=("value", "sum")
+        )
+        daily = daily.merge(rain_daily, on="date", how="left")
+    else:
+        daily["rain_total"] = 0.0
+
+    daily["wind_std"] = daily["wind_std"].fillna(0.0)
+    daily["rain_total"] = daily["rain_total"].fillna(0.0)
+
+    daily["readiness_score"] = (
+        100
+        - np.clip((daily["wind_avg"] - 6.0) * 10.0, 0, 35)
+        - np.clip((daily["wind_max"] - 8.0) * 8.0, 0, 35)
+        - np.clip(daily["wind_std"] * 6.0, 0, 15)
+        - np.clip(daily["rain_total"] * 5.0, 0, 20)
+    ).clip(0, 100).round().astype(int)
+
+    daily["installation_window"] = daily.apply(installation_status_from_row, axis=1)
+    daily["wind_unit"] = wind_unit
+    daily["rain_unit"] = rain_unit
+
+    return daily.sort_values("date").reset_index(drop=True)
+
+
+def add_installation_insight_block(pdf, site_view_df):
+    daily = build_installation_daily_table(site_view_df)
+
+    if daily.empty:
+        pdf.set_font("Helvetica", "", 8)
+        pdf.set_text_color(110, 110, 110)
+        pdf.multi_cell(
+            0,
+            4.5,
+            "Installation readiness insight unavailable because Wind Speed data is not present for this chart window."
+        )
+        pdf.set_text_color(0, 0, 0)
+        return
+
+    wind_unit = daily["wind_unit"].iloc[0] if "wind_unit" in daily.columns else ""
+    rain_unit = (
+        daily["rain_unit"].iloc[0]
+        if "rain_unit" in daily.columns and str(daily["rain_unit"].iloc[0]).strip()
+        else "mm"
+    )
+
+    best = daily.sort_values(
+        ["readiness_score", "wind_avg", "rain_total"],
+        ascending=[False, True, True]
+    ).iloc[0]
+
+    worst = daily.sort_values(
+        ["readiness_score", "wind_avg", "rain_total"],
+        ascending=[True, False, False]
+    ).iloc[0]
+
+    good_days = int((daily["installation_window"] == "Good Window").sum())
+    caution_days = int((daily["installation_window"] == "Caution Window").sum())
+    avoid_days = int((daily["installation_window"] == "Avoid Window").sum())
+
+    overall_score = int(round(daily["readiness_score"].mean()))
+    overall_status = overall_installation_status(overall_score)
+    overall_color = installation_status_color(overall_status)
+
+    if pdf.get_y() > 190:
+        pdf.add_page()
+
+    box_x = pdf.l_margin
+    box_w = pdf.w - pdf.l_margin - pdf.r_margin
+    start_y = pdf.get_y()
+    box_h = 82
+
+    pdf.set_draw_color(217, 226, 236)
+    pdf.set_fill_color(248, 251, 254)
+    pdf.rect(box_x, start_y, box_w, box_h, "DF")
+
+    pdf.set_xy(box_x + 3, start_y + 3)
+    pdf.set_font("Helvetica", "B", 11)
+    pdf.set_text_color(23, 43, 77)
+    pdf.cell(0, 6, "Erection & Installation Readiness", ln=True)
+
+    pdf.set_x(box_x + 3)
+    pdf.set_font("Helvetica", "", 7.5)
+    pdf.set_text_color(100, 110, 120)
+    pdf.multi_cell(
+        box_w - 6,
+        4,
+        "Indicative weather-to-action view for erection planning. Validate against OEM crane limits, lift plan and site stop-work rules."
+    )
+
+    card_y = pdf.get_y() + 1
+    card_w = 42
+    card_h = 18
+
+    pdf.set_fill_color(*overall_color)
+    pdf.rect(box_x + 3, card_y, card_w, card_h, "F")
+    pdf.set_draw_color(255, 255, 255)
+    pdf.rect(box_x + 3, card_y, card_w, card_h)
+
+    txt_r, txt_g, txt_b = installation_status_text_color(overall_status)
+    pdf.set_text_color(txt_r, txt_g, txt_b)
+    pdf.set_xy(box_x + 5, card_y + 3)
+    pdf.set_font("Helvetica", "B", 16)
+    pdf.cell(card_w - 4, 6, f"{overall_score}/100", ln=True, align="C")
+    pdf.set_x(box_x + 5)
+    pdf.set_font("Helvetica", "B", 8)
+    pdf.cell(card_w - 4, 4, overall_status, ln=True, align="C")
+
+    info_x = box_x + 50
+    info_w = box_w - 53
+
+    pdf.set_text_color(23, 43, 77)
+    pdf.set_xy(info_x, card_y)
+    pdf.set_font("Helvetica", "B", 8.5)
+    pdf.cell(
+        info_w,
+        5,
+        f"Best day: {pd.to_datetime(best['date']).strftime('%d %b %Y')}  |  Score {int(best['readiness_score'])}",
+        ln=True
+    )
+    pdf.set_x(info_x)
+    pdf.set_font("Helvetica", "", 8)
+    pdf.cell(
+        info_w,
+        4.5,
+        f"Avg wind {best['wind_avg']:.1f} {wind_unit} | Peak wind {best['wind_max']:.1f} {wind_unit} | Rain {best['rain_total']:.1f} {rain_unit}",
+        ln=True
+    )
+
+    pdf.set_x(info_x)
+    pdf.set_font("Helvetica", "B", 8.5)
+    pdf.cell(
+        info_w,
+        5,
+        f"Worst day: {pd.to_datetime(worst['date']).strftime('%d %b %Y')}  |  Score {int(worst['readiness_score'])}",
+        ln=True
+    )
+    pdf.set_x(info_x)
+    pdf.set_font("Helvetica", "", 8)
+    pdf.cell(
+        info_w,
+        4.5,
+        f"Avg wind {worst['wind_avg']:.1f} {wind_unit} | Peak wind {worst['wind_max']:.1f} {wind_unit} | Rain {worst['rain_total']:.1f} {rain_unit}",
+        ln=True
+    )
+
+    pdf.set_x(info_x)
+    pdf.set_font("Helvetica", "", 8)
+    pdf.cell(
+        info_w,
+        4.5,
+        f"Window count: Good {good_days} | Caution {caution_days} | Avoid {avoid_days}",
+        ln=True
+    )
+
+    strip_y = card_y + 24
+    strip_x = box_x + 3
+    strip_w = box_w - 6
+    n = max(len(daily), 1)
+    gap = 1
+    tile_w = (strip_w - gap * (n - 1)) / n
+
+    pdf.set_text_color(23, 43, 77)
+    pdf.set_xy(strip_x, strip_y - 5)
+    pdf.set_font("Helvetica", "B", 8)
+    pdf.cell(strip_w, 4, "Daily readiness strip", ln=True)
+
+    for i, row in daily.reset_index(drop=True).iterrows():
+        fill = installation_status_color(row["installation_window"])
+        x = strip_x + i * (tile_w + gap)
+
+        pdf.set_fill_color(*fill)
+        pdf.set_draw_color(255, 255, 255)
+        pdf.rect(x, strip_y, tile_w, 8, "FD")
+
+        if tile_w >= 10:
+            rr, gg, bb = installation_status_text_color(row["installation_window"])
+            pdf.set_text_color(rr, gg, bb)
+            pdf.set_font("Helvetica", "B", 6)
+            pdf.set_xy(x, strip_y + 1.4)
+            pdf.cell(tile_w, 3, str(int(row["readiness_score"])), align="C")
+
+    pdf.set_text_color(90, 100, 110)
+    pdf.set_font("Helvetica", "", 6.5)
+    label_step = max(1, int(np.ceil(len(daily) / 6)))
+
+    for i, row in daily.reset_index(drop=True).iterrows():
+        if i % label_step == 0 or i == len(daily) - 1:
+            x = strip_x + i * (tile_w + gap)
+            pdf.set_xy(x - 1, strip_y + 9)
+            pdf.cell(tile_w + 2, 3.5, pd.to_datetime(row["date"]).strftime("%d %b"), align="C")
+
+    legend_y = strip_y + 15
+    legend_items = [
+        ("Good Window", (46, 204, 113)),
+        ("Caution Window", (241, 196, 15)),
+        ("Avoid Window", (231, 76, 60)),
+    ]
+
+    legend_x = strip_x
+    for label, color in legend_items:
+        pdf.set_fill_color(*color)
+        pdf.rect(legend_x, legend_y, 4, 4, "F")
+        pdf.set_text_color(70, 80, 90)
+        pdf.set_xy(legend_x + 6, legend_y - 0.8)
+        pdf.set_font("Helvetica", "", 7)
+        pdf.cell(28, 5, label)
+        legend_x += 42
+
+    note_y = legend_y + 7
+    pdf.set_xy(strip_x, note_y)
+    pdf.set_text_color(23, 43, 77)
+    pdf.set_font("Helvetica", "", 8)
+
+    note_lines = [
+        "Prioritize green days for heavy lifts and blade installation sequencing.",
+        "Use amber days for standby planning, pre-assembly, internal logistics or partial works.",
+        "Treat red days as no-lift / contingency days unless site-approved limits and actual conditions support work."
+    ]
+
+    for line in note_lines:
+        pdf.multi_cell(box_w - 6, 4, f"- {line}")
+
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_y(start_y + box_h + 2)
+
+
 def build_combined_chart(df, site_name, scale_mode, chart_id, title_suffix):
     if df.empty:
         return None
@@ -735,37 +1024,41 @@ def build_site_pdf_report_bytes(site_name, site_df, selected_metrics, scale_mode
         pdf = ReportPDF()
         pdf.set_auto_page_break(auto=True, margin=10)
 
-        if img_15_path.exists():
+        if img15_path.exists():
             add_chart_page(
                 pdf=pdf,
-                page_title=f"{site_name} | Last 15 Days",
-                image_path=img_15_path,
+                page_title=f"{site_name} - Last 15 Days",
+                image_path=img15_path,
                 source_file_name=source_file_name,
                 selected_metrics=selected_metrics,
                 scale_mode=scale_mode
             )
+            pdf.set_y(145)
+            add_installation_insight_block(pdf, chart15_df)
         else:
             add_no_data_page(
                 pdf=pdf,
-                page_title=f"{site_name} | Last 15 Days",
+                page_title=f"{site_name} - Last 15 Days",
                 source_file_name=source_file_name,
                 selected_metrics=selected_metrics,
                 scale_mode=scale_mode
             )
-
-        if img_2_path.exists():
+        
+        if img2_path.exists():
             add_chart_page(
                 pdf=pdf,
-                page_title=f"{site_name} | Last 2 Days",
-                image_path=img_2_path,
+                page_title=f"{site_name} - Last 2 Days",
+                image_path=img2_path,
                 source_file_name=source_file_name,
                 selected_metrics=selected_metrics,
                 scale_mode=scale_mode
             )
+            pdf.set_y(145)
+            add_installation_insight_block(pdf, chart2_df)
         else:
             add_no_data_page(
                 pdf=pdf,
-                page_title=f"{site_name} | Last 2 Days",
+                page_title=f"{site_name} - Last 2 Days",
                 source_file_name=source_file_name,
                 selected_metrics=selected_metrics,
                 scale_mode=scale_mode
