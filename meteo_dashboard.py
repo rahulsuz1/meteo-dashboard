@@ -1024,11 +1024,11 @@ def build_site_pdf_report_bytes(site_name, site_df, selected_metrics, scale_mode
         pdf = ReportPDF()
         pdf.set_auto_page_break(auto=True, margin=10)
 
-        if img15_path.exists():
+        if img_15_path.exists():
             add_chart_page(
                 pdf=pdf,
                 page_title=f"{site_name} - Last 15 Days",
-                image_path=img15_path,
+                image_path=img_15_path,
                 source_file_name=source_file_name,
                 selected_metrics=selected_metrics,
                 scale_mode=scale_mode
@@ -1044,11 +1044,12 @@ def build_site_pdf_report_bytes(site_name, site_df, selected_metrics, scale_mode
                 scale_mode=scale_mode
             )
         
-        if img2_path.exists():
+        if img_2_path.exists():
             add_chart_page(
                 pdf=pdf,
                 page_title=f"{site_name} - Last 2 Days",
-                image_path=img2_path,
+                image_path=img_
+                2_path,
                 source_file_name=source_file_name,
                 selected_metrics=selected_metrics,
                 scale_mode=scale_mode
