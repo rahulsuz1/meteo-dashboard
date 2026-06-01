@@ -1034,7 +1034,7 @@ def build_site_pdf_report_bytes(site_name, site_df, selected_metrics, scale_mode
                 scale_mode=scale_mode
             )
             pdf.set_y(145)
-            add_installation_insight_block(pdf, chart15_df)
+            add_installation_insight_block(pdf, chart_15_df)
         else:
             add_no_data_page(
                 pdf=pdf,
@@ -1054,7 +1054,7 @@ def build_site_pdf_report_bytes(site_name, site_df, selected_metrics, scale_mode
                 scale_mode=scale_mode
             )
             pdf.set_y(145)
-            add_installation_insight_block(pdf, chart2_df)
+            add_installation_insight_block(pdf, chart_2_df)
         else:
             add_no_data_page(
                 pdf=pdf,
