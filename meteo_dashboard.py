@@ -828,9 +828,8 @@ def add_installation_insight_block(pdf, site_view_df):
     pdf.set_font("Helvetica", "", 8)
 
     note_lines = [
-        "Prioritize green days for heavy lifts and blade installation sequencing.
-        Use amber days for standby planning, pre-assembly, internal logistics or partial works.
-        Treat red days as no-lift / contingency days unless site-approved limits and actual conditions support work."
+        "Green: prioritize heavy lifts and blade installation sequencing. Amber: use for standby, pre-assembly and internal logistics.",
+        "Red: treat as no-lift / contingency unless site-approved limits and actual conditions support work."
     ]
 
     for line in note_lines:
