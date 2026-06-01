@@ -1048,8 +1048,7 @@ def build_site_pdf_report_bytes(site_name, site_df, selected_metrics, scale_mode
             add_chart_page(
                 pdf=pdf,
                 page_title=f"{site_name} - Last 2 Days",
-                image_path=img_
-                2_path,
+                image_path=img_2_path,
                 source_file_name=source_file_name,
                 selected_metrics=selected_metrics,
                 scale_mode=scale_mode
