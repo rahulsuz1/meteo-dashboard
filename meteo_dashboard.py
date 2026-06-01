@@ -683,7 +683,7 @@ def add_installation_insight_block(pdf, site_view_df):
     box_x = pdf.l_margin
     box_w = pdf.w - pdf.l_margin - pdf.r_margin
     start_y = pdf.get_y()
-    box_h = 82
+    box_h = 94
 
     pdf.set_draw_color(217, 226, 236)
     pdf.set_fill_color(248, 251, 254)
