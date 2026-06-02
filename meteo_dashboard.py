@@ -1087,30 +1087,32 @@ def build_optimized_excel_report(
     filtered_long,
     selected_metrics,
     scale_mode,
-    source_filename,
-    site_view_states=None
+    source_file_name,
+    site_view_states=None,
+    displayed_sites=None
 ):
     output = BytesIO()
 
     if filtered_long.empty:
         return output.getvalue()
-    report_timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-    temp_dir = REPORT_DIR / "temp_excel_images"
-    temp_dir.mkdir(parents=True, exist_ok=True)
 
-    working_df = filtered_long.copy()
-    working_df["date"] = pd.to_datetime(working_df["begin"]).dt.date
-    working_df["hour"] = pd.to_datetime(working_df["begin"]).dt.hour
-    working_df["month"] = pd.to_datetime(working_df["begin"]).dt.to_period("M").astype(str)
-    working_df["weekday"] = pd.to_datetime(working_df["begin"]).dt.day_name()
-    working_df["time_window"] = pd.cut(
-        working_df["hour"],
+    reporttimestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    tempdir = REPORTDIR / "temp_excel_images"
+    tempdir.mkdir(parents=True, exist_ok=True)
+
+    workingdf = filtered_long.copy()
+    workingdf["date"] = pd.to_datetime(workingdf["begin"]).dt.date
+    workingdf["hour"] = pd.to_datetime(workingdf["begin"]).dt.hour
+    workingdf["month"] = pd.to_datetime(workingdf["begin"]).dt.to_period("M").astype(str)
+    workingdf["weekday"] = pd.to_datetime(workingdf["begin"]).dt.day_name()
+    workingdf["timewindow"] = pd.cut(
+        workingdf["hour"],
         bins=[-1, 5, 11, 17, 23],
         labels=["Night", "Morning", "Afternoon", "Evening"]
     )
 
-    summary_df = (
-        working_df.groupby(["site", "metric", "unit"], as_index=False)
+    summarydf = (
+        workingdf.groupby(["site", "metric", "unit"], as_index=False)
         .agg(
             count=("value", "count"),
             avg=("value", "mean"),
@@ -1123,10 +1125,10 @@ def build_optimized_excel_report(
     )
 
     for col in ["avg", "min", "max", "total"]:
-        summary_df[col] = summary_df[col].round(2)
+        summarydf[col] = summarydf[col].round(2)
 
-    pivot_site_avg = (
-        working_df.pivot_table(
+    pivotsiteavg = (
+        workingdf.pivot_table(
             index="site",
             columns="metric",
             values="value",
@@ -1136,8 +1138,8 @@ def build_optimized_excel_report(
         .reset_index()
     )
 
-    pivot_date_avg = (
-        working_df.pivot_table(
+    pivotdateavg = (
+        workingdf.pivot_table(
             index="date",
             columns="metric",
             values="value",
@@ -1147,7 +1149,7 @@ def build_optimized_excel_report(
         .reset_index()
     )
 
-    dashboard_info = pd.DataFrame({
+    dashboardinfo = pd.DataFrame({
         "Field": [
             "Source File",
             "Generated On",
@@ -1159,105 +1161,127 @@ def build_optimized_excel_report(
             "End Time"
         ],
         "Value": [
-            source_filename,
+            source_file_name,
             datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             scale_mode,
             ", ".join(selected_metrics),
-            working_df["site"].nunique(),
-            len(working_df),
-            str(working_df["begin"].min()),
-            str(working_df["begin"].max())
+            workingdf["site"].nunique(),
+            len(workingdf),
+            str(workingdf["begin"].min()),
+            str(workingdf["begin"].max())
         ]
     })
 
-    chart_files = []
-    chart_positions = [
-        ("A10", "J10"),
-        ("A32", "J32"),
-        ("A54", "J54"),
-        ("A76", "J76")
-    ]
+    chartfiles = []
+    chartpositions = ["A10", "A32", "A54", "A76"]
+    chartdatablocks = []
 
-    chart_data_blocks = []
+    sitesforcharts = displayed_sites if displayed_sites else sorted(workingdf["site"].dropna().unique().tolist())
 
-    for i, site in enumerate(sorted(working_df["site"].dropna().unique())[:4]):
-        site_df = working_df[working_df["site"] == site].copy()
-        if site_df.empty:
+    for site in sitesforcharts[:4]:
+        sitedf = workingdf[workingdf["site"] == site].copy()
+        if sitedf.empty:
             continue
 
-        title_suffix = "Dashboard View"
-        fig = build_combined_chart(
-            site_df,
+        sitestate = (site_view_states or {}).get(site, {})
+        currentmode = sitestate.get("mode", "15 Day")
+
+        if currentmode == "Custom":
+            customstartdate = sitestate.get("customstartdate")
+            customenddate = sitestate.get("customenddate")
+            customstarttime = sitestate.get("customstarttime")
+            customendtime = sitestate.get("customendtime")
+
+            if all(x is not None for x in [customstartdate, customenddate, customstarttime, customendtime]):
+                customstartdt = pd.Timestamp(datetime.combine(customstartdate, customstarttime))
+                customenddt = pd.Timestamp(datetime.combine(customenddate, customendtime))
+                rangedf = getcustomrangedf(sitedf, selected_metrics, customstartdt, customenddt)
+                titlesuffix = f"Custom Range | {customstartdt} to {customenddt}"
+            else:
+                rangedf = getlastndaysdf(sitedf, selected_metrics, 15)
+                titlesuffix = "Last 15 Days"
+        elif currentmode == "2 Day":
+            rangedf = getlastndaysdf(sitedf, selected_metrics, 2)
+            titlesuffix = "Last 2 Days"
+        else:
+            rangedf = getlastndaysdf(sitedf, selected_metrics, 15)
+            titlesuffix = "Last 15 Days"
+
+        if rangedf.empty:
+            continue
+
+        fig = buildcombinedchart(
+            rangedf,
             site,
             scale_mode,
-            f"excel_{safe_filename(site)}_{report_timestamp}",
-            title_suffix
+            f"excel_{safefilename(site)}_{reporttimestamp}",
+            titlesuffix
         )
 
         if fig is None:
             continue
 
-        img_path = temp_dir / f"{safe_filename(site)}_{report_timestamp}.png"
-        fig.write_image(str(img_path), format="png", width=1600, height=900)
-        chart_files.append(img_path)
-        chart_data_blocks.append((site, img_path))
+        imgpath = tempdir / f"{safefilename(site)}_{reporttimestamp}.png"
+        fig.write_image(str(imgpath), format="png", width=1600, height=900)
+        chartfiles.append(imgpath)
+        chartdatablocks.append((site, imgpath))
 
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
-        working_df.to_excel(writer, sheet_name="CleanData", index=False)
-        summary_df.to_excel(writer, sheet_name="Summary", index=False)
-        pivot_site_avg.to_excel(writer, sheet_name="Pivot_Site_Avg", index=False)
-        pivot_date_avg.to_excel(writer, sheet_name="Pivot_Date_Avg", index=False)
-        dashboard_info.to_excel(writer, sheet_name="Dashboard", index=False, startrow=0)
+        workingdf.to_excel(writer, sheet_name="CleanData", index=False)
+        summarydf.to_excel(writer, sheet_name="Summary", index=False)
+        pivotsiteavg.to_excel(writer, sheet_name="PivotSiteAvg", index=False)
+        pivotdateavg.to_excel(writer, sheet_name="PivotDateAvg", index=False)
+        dashboardinfo.to_excel(writer, sheet_name="Dashboard", index=False, startrow=0)
 
     output.seek(0)
     wb = load_workbook(output)
 
-    header_fill = PatternFill("solid", fgColor="1F4E78")
-    header_font = Font(color="FFFFFF", bold=True, size=11)
+    headerfill = PatternFill("solid", fgColor="1F4E78")
+    headerfont = Font(color="FFFFFF", bold=True, size=11)
     thin = Side(style="thin", color="D9E2EC")
     border = Border(left=thin, right=thin, top=thin, bottom=thin)
 
-    heat_rule = ColorScaleRule(
+    heatrule = ColorScaleRule(
         start_type="min", start_color="63BE7B",
         mid_type="percentile", mid_value=50, mid_color="FFEB84",
         end_type="max", end_color="F8696B"
     )
 
-    def style_sheet(ws, freeze="A2"):
+    def stylesheet(ws, freeze="A2"):
         ws.freeze_panes = freeze
         for cell in ws[1]:
-            cell.fill = header_fill
-            cell.font = header_font
+            cell.fill = headerfill
+            cell.font = headerfont
             cell.alignment = Alignment(horizontal="center", vertical="center")
             cell.border = border
 
         for col in ws.columns:
-            max_len = 0
-            col_letter = get_column_letter(col[0].column)
+            maxlen = 0
+            colletter = get_column_letter(col[0].column)
             for cell in col[:300]:
                 try:
                     if cell.value is not None:
-                        max_len = max(max_len, len(str(cell.value)))
+                        maxlen = max(maxlen, len(str(cell.value)))
                 except Exception:
                     pass
-            ws.column_dimensions[col_letter].width = min(max_len + 3, 28)
+            ws.column_dimensions[colletter].width = min(maxlen + 3, 28)
 
-    for sheet_name in ["CleanData", "Summary", "Pivot_Site_Avg", "Pivot_Date_Avg"]:
-        ws = wb[sheet_name]
-        style_sheet(ws)
+    for sheetname in ["CleanData", "Summary", "PivotSiteAvg", "PivotDateAvg"]:
+        ws = wb[sheetname]
+        stylesheet(ws)
 
-    for sheet_name in ["Pivot_Site_Avg", "Pivot_Date_Avg"]:
-        ws = wb[sheet_name]
+    for sheetname in ["PivotSiteAvg", "PivotDateAvg"]:
+        ws = wb[sheetname]
         if ws.max_row > 1 and ws.max_column > 1:
             ws.conditional_formatting.add(
                 f"B2:{get_column_letter(ws.max_column)}{ws.max_row}",
-                heat_rule
+                heatrule
             )
 
-    for sheet_name in ["CleanData", "Summary"]:
-        ws = wb[sheet_name]
-        table_ref = f"A1:{get_column_letter(ws.max_column)}{ws.max_row}"
-        tab = Table(displayName=f"Tbl_{sheet_name}", ref=table_ref)
+    for sheetname in ["CleanData", "Summary"]:
+        ws = wb[sheetname]
+        tableref = f"A1:{get_column_letter(ws.max_column)}{ws.max_row}"
+        tab = Table(displayName=f"Tbl{sheetname}", ref=tableref)
         tab.tableStyleInfo = TableStyleInfo(
             name="TableStyleMedium2",
             showFirstColumn=False,
@@ -1267,40 +1291,35 @@ def build_optimized_excel_report(
         )
         ws.add_table(tab)
 
-    dashboard_ws = wb["Dashboard"]
-    dashboard_ws["A1"] = "Optimized Meteorological Dashboard"
-    dashboard_ws["A1"].font = Font(bold=True, size=16, color="1F1F1F")
-    dashboard_ws["A2"] = "Filtered export from current dashboard selection"
-    dashboard_ws["A2"].font = Font(italic=True, size=10, color="6B778C")
+    dashboardws = wb["Dashboard"]
+    dashboardws["A1"] = "Optimized Meteorological Dashboard"
+    dashboardws["A1"].font = Font(bold=True, size=16, color="1F1F1F")
+    dashboardws["A2"] = "Filtered export from current dashboard selection"
+    dashboardws["A2"].font = Font(italic=True, size=10, color="6B778C")
+    dashboardws.column_dimensions["A"].width = 24
+    dashboardws.column_dimensions["B"].width = 40
 
-    for cell in dashboard_ws[4]:
-        cell.fill = header_fill
-        cell.font = header_font
-
-    dashboard_ws.column_dimensions["A"].width = 24
-    dashboard_ws.column_dimensions["B"].width = 40
-
-    for idx, (site, img_path) in enumerate(chart_data_blocks):
-        if idx >= len(chart_positions):
+    for idx, (site, imgpath) in enumerate(chartdatablocks):
+        if idx >= len(chartpositions):
             break
-        anchor = chart_positions[idx][0]
-        img = XLImage(str(img_path))
+        anchor = chartpositions[idx]
+        img = XLImage(str(imgpath))
         img.width = 520
         img.height = 290
-        dashboard_ws.add_image(img, anchor)
+        dashboardws.add_image(img, anchor)
 
-    final_output = BytesIO()
-    wb.save(final_output)
-    final_output.seek(0)
+    finaloutput = BytesIO()
+    wb.save(finaloutput)
+    finaloutput.seek(0)
 
-    for img_path in chart_files:
+    for imgpath in chartfiles:
         try:
-            if img_path.exists():
-                img_path.unlink()
+            if imgpath.exists():
+                imgpath.unlink()
         except Exception:
             pass
 
-    return final_output.getvalue()
+    return finaloutput.getvalue()
 
 # =========================================================
 # STATE
