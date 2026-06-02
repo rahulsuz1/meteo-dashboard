@@ -1608,7 +1608,7 @@ else:
                 site_df,
                 site,
                 scale_mode,
-                title_suffix
+                
             )
 
         if fig is not None:
