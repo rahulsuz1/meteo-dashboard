@@ -996,7 +996,7 @@ def build_site_pdf_report_bytes(site_name, site_df, selected_metrics, scale_mode
     safe_site = safe_filename(site_name)
     temp_dir = REPORT_DIR / "_temp_images"
     temp_dir.mkdir(parents=True, exist_ok=True)
-
+    report_timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
     chart_15_df = get_last_n_days_df(site_df, selected_metrics, 15)
     chart_2_df = get_last_n_days_df(site_df, selected_metrics, 2)
 
