@@ -1188,11 +1188,11 @@ def build_optimized_excel_report(
 
         title_suffix = "Dashboard View"
         fig = build_combined_chart(
-            df=site_df,
-            sitename=site,
-            scalemode=scale_mode,
-            chartid=f"excel_{safe_filename(site)}_{report_timestamp}",
-            titlesuffix=title_suffix
+            site_df,
+            site,
+            scale_mode,
+            f"excel_{safe_filename(site)}_{report_timestamp}",
+            title_suffix
         )
 
         if fig is None:
@@ -1587,11 +1587,11 @@ else:
             title_suffix = "Last 15 Days"
 
         fig = build_combined_chart(
-            df=range_df,
-            site_name=site,
-            scale_mode=scale_mode,
-            chart_id=f"{safe_site}_{current_mode}_{scale_mode}_{len(range_df)}",
-            title_suffix=title_suffix
+            site_df,
+            site,
+            scale_mode,
+            f"excel_{safe_filename(site)}_{report_timestamp}",
+            title_suffix
         )
 
         if fig is not None:
