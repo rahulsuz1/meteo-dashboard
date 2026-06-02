@@ -1604,13 +1604,12 @@ else:
             range_df = get_last_n_days_df(site_df, selected_metrics, 15)
             title_suffix = "Last 15 Days"
 
-        fig = build_combined_chart(
-            site_df,
-            site,
-            scale_mode,
-            
-            title_suffix
-        )
+            fig = build_combined_chart(
+                site_df,
+                site,
+                scale_mode,
+                title_suffix
+            )
 
         if fig is not None:
             st.plotly_chart(fig, use_container_width=True, config={"displaylogo": False, "responsive": True})
