@@ -1096,7 +1096,7 @@ def build_optimized_excel_report(
     if filtered_long.empty:
         return output.getvalue()
 
-    reporttimestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    report_timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
     tempdir = REPORTDIR / "temp_excel_images"
     tempdir.mkdir(parents=True, exist_ok=True)
 
@@ -1214,14 +1214,14 @@ def build_optimized_excel_report(
             rangedf,
             site,
             scale_mode,
-            f"excel_{safefilename(site)}_{reporttimestamp}",
+            f"excel_{safefilename(site)}_{report_timestamp}",
             titlesuffix
         )
 
         if fig is None:
             continue
 
-        imgpath = tempdir / f"{safefilename(site)}_{reporttimestamp}.png"
+        imgpath = tempdir / f"{safefilename(site)}_{report_timestamp}.png"
         fig.write_image(str(imgpath), format="png", width=1600, height=900)
         chartfiles.append(imgpath)
         chartdatablocks.append((site, imgpath))
