@@ -1094,7 +1094,6 @@ def build_optimized_excel_report(
 
     if filtered_long.empty:
         return output.getvalue()
-
     report_timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
     temp_dir = REPORT_DIR / "temp_excel_images"
     temp_dir.mkdir(parents=True, exist_ok=True)
