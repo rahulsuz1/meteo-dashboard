@@ -11,6 +11,13 @@ from datetime import datetime, time
 from fpdf import FPDF
 import smtplib
 from email.message import EmailMessage
+from openpyxl import load_workbook
+from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
+from openpyxl.formatting.rule import ColorScaleRule
+from openpyxl.worksheet.table import Table, TableStyleInfo
+from openpyxl.drawing.image import Image as XLImage
+from openpyxl.utils import get_column_letter
+from openpyxl.worksheet.datavalidation import DataValidation
 
 class ReportPDF(FPDF):
     def footer(self):
@@ -1075,6 +1082,227 @@ def build_site_pdf_report_bytes(site_name, site_df, selected_metrics, scale_mode
                 except Exception:
                     pass
 
+
+def build_optimized_excel_report(
+    filtered_long,
+    selected_metrics,
+    scale_mode,
+    source_filename,
+    site_view_states=None
+):
+    output = BytesIO()
+
+    if filtered_long.empty:
+        return output.getvalue()
+
+    report_timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    temp_dir = REPORT_DIR / "temp_excel_images"
+    temp_dir.mkdir(parents=True, exist_ok=True)
+
+    working_df = filtered_long.copy()
+    working_df["date"] = pd.to_datetime(working_df["begin"]).dt.date
+    working_df["hour"] = pd.to_datetime(working_df["begin"]).dt.hour
+    working_df["month"] = pd.to_datetime(working_df["begin"]).dt.to_period("M").astype(str)
+    working_df["weekday"] = pd.to_datetime(working_df["begin"]).dt.day_name()
+    working_df["time_window"] = pd.cut(
+        working_df["hour"],
+        bins=[-1, 5, 11, 17, 23],
+        labels=["Night", "Morning", "Afternoon", "Evening"]
+    )
+
+    summary_df = (
+        working_df.groupby(["site", "metric", "unit"], as_index=False)
+        .agg(
+            count=("value", "count"),
+            avg=("value", "mean"),
+            min=("value", "min"),
+            max=("value", "max"),
+            total=("value", "sum")
+        )
+        .sort_values(["site", "metric"])
+        .reset_index(drop=True)
+    )
+
+    for col in ["avg", "min", "max", "total"]:
+        summary_df[col] = summary_df[col].round(2)
+
+    pivot_site_avg = (
+        working_df.pivot_table(
+            index="site",
+            columns="metric",
+            values="value",
+            aggfunc="mean"
+        )
+        .round(2)
+        .reset_index()
+    )
+
+    pivot_date_avg = (
+        working_df.pivot_table(
+            index="date",
+            columns="metric",
+            values="value",
+            aggfunc="mean"
+        )
+        .round(2)
+        .reset_index()
+    )
+
+    dashboard_info = pd.DataFrame({
+        "Field": [
+            "Source File",
+            "Generated On",
+            "Scale Mode",
+            "Selected Metrics",
+            "Sites",
+            "Records",
+            "Start Time",
+            "End Time"
+        ],
+        "Value": [
+            source_filename,
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            scale_mode,
+            ", ".join(selected_metrics),
+            working_df["site"].nunique(),
+            len(working_df),
+            str(working_df["begin"].min()),
+            str(working_df["begin"].max())
+        ]
+    })
+
+    chart_files = []
+    chart_positions = [
+        ("A10", "J10"),
+        ("A32", "J32"),
+        ("A54", "J54"),
+        ("A76", "J76")
+    ]
+
+    chart_data_blocks = []
+
+    for i, site in enumerate(sorted(working_df["site"].dropna().unique())[:4]):
+        site_df = working_df[working_df["site"] == site].copy()
+        if site_df.empty:
+            continue
+
+        title_suffix = "Dashboard View"
+        fig = build_combined_chart(
+            df=site_df,
+            sitename=site,
+            scalemode=scale_mode,
+            chartid=f"excel_{safe_filename(site)}_{report_timestamp}",
+            titlesuffix=title_suffix
+        )
+
+        if fig is None:
+            continue
+
+        img_path = temp_dir / f"{safe_filename(site)}_{report_timestamp}.png"
+        fig.write_image(str(img_path), format="png", width=1600, height=900)
+        chart_files.append(img_path)
+        chart_data_blocks.append((site, img_path))
+
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        working_df.to_excel(writer, sheet_name="CleanData", index=False)
+        summary_df.to_excel(writer, sheet_name="Summary", index=False)
+        pivot_site_avg.to_excel(writer, sheet_name="Pivot_Site_Avg", index=False)
+        pivot_date_avg.to_excel(writer, sheet_name="Pivot_Date_Avg", index=False)
+        dashboard_info.to_excel(writer, sheet_name="Dashboard", index=False, startrow=0)
+
+    output.seek(0)
+    wb = load_workbook(output)
+
+    header_fill = PatternFill("solid", fgColor="1F4E78")
+    header_font = Font(color="FFFFFF", bold=True, size=11)
+    thin = Side(style="thin", color="D9E2EC")
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+    heat_rule = ColorScaleRule(
+        start_type="min", start_color="63BE7B",
+        mid_type="percentile", mid_value=50, mid_color="FFEB84",
+        end_type="max", end_color="F8696B"
+    )
+
+    def style_sheet(ws, freeze="A2"):
+        ws.freeze_panes = freeze
+        for cell in ws[1]:
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+            cell.border = border
+
+        for col in ws.columns:
+            max_len = 0
+            col_letter = get_column_letter(col[0].column)
+            for cell in col[:300]:
+                try:
+                    if cell.value is not None:
+                        max_len = max(max_len, len(str(cell.value)))
+                except Exception:
+                    pass
+            ws.column_dimensions[col_letter].width = min(max_len + 3, 28)
+
+    for sheet_name in ["CleanData", "Summary", "Pivot_Site_Avg", "Pivot_Date_Avg"]:
+        ws = wb[sheet_name]
+        style_sheet(ws)
+
+    for sheet_name in ["Pivot_Site_Avg", "Pivot_Date_Avg"]:
+        ws = wb[sheet_name]
+        if ws.max_row > 1 and ws.max_column > 1:
+            ws.conditional_formatting.add(
+                f"B2:{get_column_letter(ws.max_column)}{ws.max_row}",
+                heat_rule
+            )
+
+    for sheet_name in ["CleanData", "Summary"]:
+        ws = wb[sheet_name]
+        table_ref = f"A1:{get_column_letter(ws.max_column)}{ws.max_row}"
+        tab = Table(displayName=f"Tbl_{sheet_name}", ref=table_ref)
+        tab.tableStyleInfo = TableStyleInfo(
+            name="TableStyleMedium2",
+            showFirstColumn=False,
+            showLastColumn=False,
+            showRowStripes=True,
+            showColumnStripes=False
+        )
+        ws.add_table(tab)
+
+    dashboard_ws = wb["Dashboard"]
+    dashboard_ws["A1"] = "Optimized Meteorological Dashboard"
+    dashboard_ws["A1"].font = Font(bold=True, size=16, color="1F1F1F")
+    dashboard_ws["A2"] = "Filtered export from current dashboard selection"
+    dashboard_ws["A2"].font = Font(italic=True, size=10, color="6B778C")
+
+    for cell in dashboard_ws[4]:
+        cell.fill = header_fill
+        cell.font = header_font
+
+    dashboard_ws.column_dimensions["A"].width = 24
+    dashboard_ws.column_dimensions["B"].width = 40
+
+    for idx, (site, img_path) in enumerate(chart_data_blocks):
+        if idx >= len(chart_positions):
+            break
+        anchor = chart_positions[idx][0]
+        img = XLImage(str(img_path))
+        img.width = 520
+        img.height = 290
+        dashboard_ws.add_image(img, anchor)
+
+    final_output = BytesIO()
+    wb.save(final_output)
+    final_output.seek(0)
+
+    for img_path in chart_files:
+        try:
+            if img_path.exists():
+                img_path.unlink()
+        except Exception:
+            pass
+
+    return final_output.getvalue()
+
 # =========================================================
 # STATE
 # =========================================================
@@ -1444,6 +1672,34 @@ if st.button("Generate Site PDF Reports"):
             st.success(f"Generated {len(generated_reports)} site PDF report(s) in: {REPORT_DIR}")
         else:
             st.warning("No site PDFs were generated.")
+
+st.markdown("### Generate Optimized Excel")
+
+if st.button("Generate Optimized Excel"):
+    if filtered_long.empty:
+        st.warning("No filtered data available to export.")
+    elif not selected_metrics:
+        st.warning("Please select at least one parameter before generating the Excel report.")
+    else:
+        with st.spinner("Generating optimized Excel report..."):
+            excel_bytes = build_optimized_excel_report(
+                filtered_long=filtered_long,
+                selected_metrics=selected_metrics,
+                scale_mode=scale_mode,
+                source_filename=uploaded_file.name,
+                site_view_states=st.session_state.get("site_view_state", {})
+            )
+
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        excel_name = f"Optimized_Meteo_Report_{timestamp}.xlsx"
+
+        st.download_button(
+            label="Download Optimized Excel",
+            data=excel_bytes,
+            file_name=excel_name,
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True
+        )
 
 # =========================================================
 # PDF DOWNLOADS
