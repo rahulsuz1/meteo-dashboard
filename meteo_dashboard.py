@@ -1608,7 +1608,7 @@ else:
             site_df,
             site,
             scale_mode,
-            f"excel_{safe_filename(site)}_{report_timestamp}",
+            
             title_suffix
         )
 
