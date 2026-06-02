@@ -1097,8 +1097,8 @@ def build_optimized_excel_report(
         return output.getvalue()
 
     report_timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-    tempdir = REPORTDIR / "temp_excel_images"
-    tempdir.mkdir(parents=True, exist_ok=True)
+    temp_dir = REPORT_DIR / "temp_excel_images"
+    temp_dir.mkdir(parents=True, exist_ok=True)
 
     workingdf = filtered_long.copy()
     workingdf["date"] = pd.to_datetime(workingdf["begin"]).dt.date
@@ -1111,7 +1111,7 @@ def build_optimized_excel_report(
         labels=["Night", "Morning", "Afternoon", "Evening"]
     )
 
-    summarydf = (
+    summary_df = (
         workingdf.groupby(["site", "metric", "unit"], as_index=False)
         .agg(
             count=("value", "count"),
@@ -1125,7 +1125,7 @@ def build_optimized_excel_report(
     )
 
     for col in ["avg", "min", "max", "total"]:
-        summarydf[col] = summarydf[col].round(2)
+        summary_df[col] = summary_df[col].round(2)
 
     pivotsiteavg = (
         workingdf.pivot_table(
@@ -1184,51 +1184,51 @@ def build_optimized_excel_report(
             continue
 
         sitestate = (site_view_states or {}).get(site, {})
-        currentmode = sitestate.get("mode", "15 Day")
+        current_mode = sitestate.get("mode", "15 Day")
 
-        if currentmode == "Custom":
-            customstartdate = sitestate.get("customstartdate")
-            customenddate = sitestate.get("customenddate")
-            customstarttime = sitestate.get("customstarttime")
-            customendtime = sitestate.get("customendtime")
+        if current_mode == "Custom":
+            custom_start_date = sitestate.get("custom_start_date")
+            custom_end_date = sitestate.get("custom_end_date")
+            custom_start_time = sitestate.get("custom_start_time")
+            custom_end_time = sitestate.get("custom_end_time")
 
-            if all(x is not None for x in [customstartdate, customenddate, customstarttime, customendtime]):
-                customstartdt = pd.Timestamp(datetime.combine(customstartdate, customstarttime))
-                customenddt = pd.Timestamp(datetime.combine(customenddate, customendtime))
-                rangedf = getcustomrangedf(sitedf, selected_metrics, customstartdt, customenddt)
-                titlesuffix = f"Custom Range | {customstartdt} to {customenddt}"
+            if all(x is not None for x in [custom_start_date, custom_end_date, custom_start_time, custom_end_time]):
+                custom_start_dt = pd.Timestamp(datetime.combine(custom_start_date, custom_start_time))
+                custom_end_dt = pd.Timestamp(datetime.combine(custom_end_date, custom_end_time))
+                range_df = getcustomrange_df(sitedf, selected_metrics, custom_start_dt, custom_end_dt)
+                title_suffix = f"Custom Range | {custom_start_dt} to {custom_end_dt}"
             else:
-                rangedf = getlastndaysdf(sitedf, selected_metrics, 15)
-                titlesuffix = "Last 15 Days"
-        elif currentmode == "2 Day":
-            rangedf = getlastndaysdf(sitedf, selected_metrics, 2)
-            titlesuffix = "Last 2 Days"
+                range_df = getlastndaysdf(sitedf, selected_metrics, 15)
+                title_suffix = "Last 15 Days"
+        elif current_mode == "2 Day":
+            range_df = getlastndaysdf(sitedf, selected_metrics, 2)
+            title_suffix = "Last 2 Days"
         else:
-            rangedf = getlastndaysdf(sitedf, selected_metrics, 15)
-            titlesuffix = "Last 15 Days"
+            range_df = getlastndaysdf(sitedf, selected_metrics, 15)
+            title_suffix = "Last 15 Days"
 
-        if rangedf.empty:
+        if range_df.empty:
             continue
 
         fig = buildcombinedchart(
-            rangedf,
+            range_df,
             site,
             scale_mode,
             f"excel_{safefilename(site)}_{report_timestamp}",
-            titlesuffix
+            title_suffix
         )
 
         if fig is None:
             continue
 
-        imgpath = tempdir / f"{safefilename(site)}_{report_timestamp}.png"
+        imgpath = temp_dir / f"{safefilename(site)}_{report_timestamp}.png"
         fig.write_image(str(imgpath), format="png", width=1600, height=900)
         chartfiles.append(imgpath)
         chartdatablocks.append((site, imgpath))
 
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
         workingdf.to_excel(writer, sheet_name="CleanData", index=False)
-        summarydf.to_excel(writer, sheet_name="Summary", index=False)
+        summary_df.to_excel(writer, sheet_name="Summary", index=False)
         pivotsiteavg.to_excel(writer, sheet_name="PivotSiteAvg", index=False)
         pivotdateavg.to_excel(writer, sheet_name="PivotDateAvg", index=False)
         dashboardinfo.to_excel(writer, sheet_name="Dashboard", index=False, startrow=0)
@@ -1266,22 +1266,22 @@ def build_optimized_excel_report(
                     pass
             ws.column_dimensions[colletter].width = min(maxlen + 3, 28)
 
-    for sheetname in ["CleanData", "Summary", "PivotSiteAvg", "PivotDateAvg"]:
-        ws = wb[sheetname]
+    for sheet_name in ["CleanData", "Summary", "PivotSiteAvg", "PivotDateAvg"]:
+        ws = wb[sheet_name]
         stylesheet(ws)
 
-    for sheetname in ["PivotSiteAvg", "PivotDateAvg"]:
-        ws = wb[sheetname]
+    for sheet_name in ["PivotSiteAvg", "PivotDateAvg"]:
+        ws = wb[sheet_name]
         if ws.max_row > 1 and ws.max_column > 1:
             ws.conditional_formatting.add(
                 f"B2:{get_column_letter(ws.max_column)}{ws.max_row}",
                 heatrule
             )
 
-    for sheetname in ["CleanData", "Summary"]:
-        ws = wb[sheetname]
+    for sheet_name in ["CleanData", "Summary"]:
+        ws = wb[sheet_name]
         tableref = f"A1:{get_column_letter(ws.max_column)}{ws.max_row}"
-        tab = Table(displayName=f"Tbl{sheetname}", ref=tableref)
+        tab = Table(displayName=f"Tbl{sheet_name}", ref=tableref)
         tab.tableStyleInfo = TableStyleInfo(
             name="TableStyleMedium2",
             showFirstColumn=False,
