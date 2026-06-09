@@ -104,7 +104,7 @@ html, body, [class*="css"] {
         var(--bg);
 }
 #MainMenu, footer {
-    visibility: hidden !important;
+    visibility: visible !important;
 }
 .main-shell {
     margin-bottom: 0.8rem;
