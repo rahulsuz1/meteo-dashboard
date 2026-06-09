@@ -17,7 +17,7 @@ from openpyxl.formatting.rule import ColorScaleRule
 from openpyxl.worksheet.table import Table, TableStyleInfo
 from openpyxl.drawing.image import Image as XLImage
 from openpyxl.utils import get_column_letter
-from openpyxl.worksheet.datavalidation import DataValidation
+
 
 class ReportPDF(FPDF):
     def footer(self):
@@ -33,6 +33,7 @@ class ReportPDF(FPDF):
             "R"
         )
 
+
 # =========================================================
 # PAGE CONFIG
 # =========================================================
@@ -41,7 +42,6 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed"
 )
-
 
 st.markdown("""
 <style>
@@ -65,7 +65,6 @@ st.markdown("""
     Developed by : Dhruv Pathak and Rahul Singh
 </div>
 """, unsafe_allow_html=True)
-
 
 # =========================================================
 # STYLING
@@ -104,7 +103,6 @@ html, body, [class*="css"] {
         linear-gradient(180deg, rgba(63,169,245,0.12) 0%, rgba(239,244,249,1) 240px),
         var(--bg);
 }
-
 #MainMenu, footer {
     visibility: hidden !important;
 }
@@ -314,7 +312,6 @@ COLOR_MAP = {
 # =========================================================
 # HELPERS
 # =========================================================
-
 def send_reports_email_gmail(to_emails, subject, body, reports):
     sender = st.secrets["EMAIL_SENDER"]
     password = st.secrets["EMAIL_PASSWORD"]
@@ -327,7 +324,7 @@ def send_reports_email_gmail(to_emails, subject, body, reports):
 
     for report in reports:
         pdf_path = report["path"]
-        file_name = report["file_name"]
+        file_name = report["filename"]
 
         with open(pdf_path, "rb") as f:
             pdf_data = f.read()
@@ -346,11 +343,14 @@ def send_reports_email_gmail(to_emails, subject, body, reports):
         server.login(sender, password)
         server.send_message(msg)
 
+
 def safe_filename(name: str) -> str:
     return re.sub(r"[^A-Za-z0-9_.-]+", "_", str(name))
 
+
 def get_file_hash(file_bytes: bytes) -> str:
     return hashlib.md5(file_bytes).hexdigest()
+
 
 def append_upload_log(record: dict):
     df_new = pd.DataFrame([record])
@@ -364,10 +364,12 @@ def append_upload_log(record: dict):
         df_all = df_new
     df_all.to_csv(LOG_FILE, index=False)
 
+
 def load_upload_log():
     if LOG_FILE.exists():
         return pd.read_csv(LOG_FILE)
     return pd.DataFrame()
+
 
 def split_variable(col_name):
     text = str(col_name).strip()
@@ -378,6 +380,7 @@ def split_variable(col_name):
         unit = match.group(3).strip()
         return site, metric, unit
     return text, "Value", ""
+
 
 def parse_semicolon_table(lines):
     clean_lines = [ln for ln in lines if str(ln).strip()]
@@ -420,6 +423,7 @@ def parse_semicolon_table(lines):
     df = df.dropna(subset=[begin_col]).sort_values(begin_col).reset_index(drop=True)
     return df, begin_col, end_col
 
+
 def wide_to_long(df, begin_col, end_col):
     id_vars = [begin_col] + ([end_col] if end_col else [])
     value_vars = [c for c in df.columns if c not in id_vars]
@@ -434,6 +438,7 @@ def wide_to_long(df, begin_col, end_col):
     long_df = long_df.rename(columns=rename_map)
     long_df = long_df.dropna(subset=["begin", "value"]).sort_values(["site", "metric", "begin"]).reset_index(drop=True)
     return long_df
+
 
 @st.cache_data(show_spinner=False)
 def parse_uploaded_content(file_bytes: bytes, file_name: str):
@@ -459,6 +464,7 @@ def parse_uploaded_content(file_bytes: bytes, file_name: str):
     long_df = wide_to_long(wide_df, begin_col, end_col)
     return wide_df, long_df, begin_col, end_col
 
+
 @st.cache_data(show_spinner=False)
 def prepare_long_df(long_df):
     df = long_df.copy()
@@ -466,6 +472,7 @@ def prepare_long_df(long_df):
     df["metric"] = df["metric"].astype(str).str.strip()
     df["unit"] = df["unit"].astype(str).replace("nan", "")
     return df.sort_values(["site", "metric", "begin"]).reset_index(drop=True)
+
 
 def save_upload_bundle(uploaded_file, file_bytes, wide_df, long_df):
     ts = datetime.now()
@@ -501,6 +508,7 @@ def save_upload_bundle(uploaded_file, file_bytes, wide_df, long_df):
         "file_hash": get_file_hash(file_bytes)
     })
 
+
 def normalize_series(s):
     s = pd.to_numeric(s, errors="coerce")
     s_min = s.min()
@@ -511,8 +519,15 @@ def normalize_series(s):
         return pd.Series(50.0, index=s.index)
     return ((s - s_min) / (s_max - s_min)) * 100.0
 
+
 def get_filtered_site_metric_df(site_df, selected_metrics):
-    return site_df[site_df["metric"].isin(selected_metrics)].copy().dropna(subset=["begin"]).sort_values("begin")
+    return (
+        site_df[site_df["metric"].isin(selected_metrics)]
+        .copy()
+        .dropna(subset=["begin"])
+        .sort_values("begin")
+    )
+
 
 def get_last_n_days_df(site_df, selected_metrics, n_days):
     df = get_filtered_site_metric_df(site_df, selected_metrics)
@@ -522,11 +537,13 @@ def get_last_n_days_df(site_df, selected_metrics, n_days):
     start_ts = max_ts - pd.Timedelta(days=n_days)
     return df[df["begin"] >= start_ts].copy()
 
+
 def get_custom_range_df(site_df, selected_metrics, start_dt, end_dt):
     df = get_filtered_site_metric_df(site_df, selected_metrics)
     if df.empty or start_dt is None or end_dt is None:
         return df.copy()
     return df[(df["begin"] >= start_dt) & (df["begin"] <= end_dt)].copy()
+
 
 def build_latest_table(df):
     if df.empty:
@@ -543,6 +560,7 @@ def build_latest_table(df):
     latest_df["latest_value"] = latest_df["latest_value"].round(2)
     return latest_df
 
+
 def build_window_summary(df):
     if df.empty:
         return pd.DataFrame(columns=["metric", "unit", "avg", "min", "max", "latest_time"])
@@ -558,6 +576,7 @@ def build_window_summary(df):
         summary_df[col] = summary_df[col].round(2)
     return summary_df
 
+
 def installation_status_from_row(row):
     if row["wind_avg"] <= 8.0 and row["wind_max"] <= 10.0 and row["rain_total"] <= 1.0:
         return "Good Window"
@@ -568,10 +587,10 @@ def installation_status_from_row(row):
 
 def installation_status_color(status):
     if status == "Good Window":
-        return (46, 204, 113)   # green
+        return (46, 204, 113)
     if status == "Caution Window":
-        return (241, 196, 15)   # amber
-    return (231, 76, 60)        # red
+        return (241, 196, 15)
+    return (231, 76, 60)
 
 
 def installation_status_text_color(status):
@@ -620,9 +639,7 @@ def build_installation_daily_table(site_view_df):
     )
 
     if not rain_df.empty:
-        rain_daily = rain_df.groupby("date", as_index=False).agg(
-            rain_total=("value", "sum")
-        )
+        rain_daily = rain_df.groupby("date", as_index=False).agg(rain_total=("value", "sum"))
         daily = daily.merge(rain_daily, on="date", how="left")
     else:
         daily["rain_total"] = 0.0
@@ -660,11 +677,7 @@ def add_installation_insight_block(pdf, site_view_df):
         return
 
     wind_unit = daily["wind_unit"].iloc[0] if "wind_unit" in daily.columns else ""
-    rain_unit = (
-        daily["rain_unit"].iloc[0]
-        if "rain_unit" in daily.columns and str(daily["rain_unit"].iloc[0]).strip()
-        else "mm"
-    )
+    rain_unit = daily["rain_unit"].iloc[0] if "rain_unit" in daily.columns and str(daily["rain_unit"].iloc[0]).strip() else "mm"
 
     best = daily.sort_values(
         ["readiness_score", "wind_avg", "rain_total"],
@@ -847,7 +860,7 @@ def add_installation_insight_block(pdf, site_view_df):
     pdf.set_y(start_y + box_h + 2)
 
 
-def build_combined_chart(df, site_name, scale_mode, chart_id, title_suffix):
+def build_combined_chart(df, site_name, scale_mode, chart_id=None, title_suffix=""):
     if df.empty:
         return None
 
@@ -885,8 +898,10 @@ def build_combined_chart(df, site_name, scale_mode, chart_id, title_suffix):
             customdata=mdf["value"]
         ))
 
+    full_title = f"{site_name} | {title_suffix}" if title_suffix else site_name
+
     fig.update_layout(
-        title=f"{site_name} | {title_suffix}",
+        title=full_title,
         template="plotly_white",
         height=455,
         margin=dict(l=10, r=10, t=35, b=60),
@@ -903,17 +918,32 @@ def build_combined_chart(df, site_name, scale_mode, chart_id, title_suffix):
         hovermode="x unified",
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="#FFFFFF",
-        uirevision=chart_id,
+        uirevision=chart_id or f"{site_name}_{scale_mode}",
         font=dict(color="#172B4D")
     )
 
-    fig.update_xaxes(title="Timestamp", showgrid=True, gridcolor="#E7EEF5", zeroline=False, showline=True, linecolor="#D9E2EC")
-    fig.update_yaxes(title=y_title, showgrid=True, gridcolor="#E7EEF5", zeroline=False, showline=True, linecolor="#D9E2EC")
+    fig.update_xaxes(
+        title="Timestamp",
+        showgrid=True,
+        gridcolor="#E7EEF5",
+        zeroline=False,
+        showline=True,
+        linecolor="#D9E2EC"
+    )
+    fig.update_yaxes(
+        title=y_title,
+        showgrid=True,
+        gridcolor="#E7EEF5",
+        zeroline=False,
+        showline=True,
+        linecolor="#D9E2EC"
+    )
 
     if y_range is not None:
         fig.update_yaxes(range=y_range)
 
     return fig
+
 
 def make_metric_summary(df_metric):
     if df_metric.empty:
@@ -944,6 +974,7 @@ def make_metric_summary(df_metric):
 
     return summary.sort_values("avg", ascending=False).reset_index(drop=True)
 
+
 def build_insights(df_metric, metric_name, unit):
     insights = []
     if df_metric.empty:
@@ -969,6 +1000,7 @@ def build_insights(df_metric, metric_name, unit):
 
     return insights
 
+
 def add_chart_page(pdf, page_title, image_path, source_file_name, selected_metrics, scale_mode):
     pdf.add_page()
     pdf.set_font("Helvetica", style="B", size=13)
@@ -981,6 +1013,7 @@ def add_chart_page(pdf, page_title, image_path, source_file_name, selected_metri
     pdf.ln(3)
     pdf.image(str(image_path), x=10, y=pdf.get_y(), w=190)
 
+
 def add_no_data_page(pdf, page_title, source_file_name, selected_metrics, scale_mode):
     pdf.add_page()
     pdf.set_font("Helvetica", style="B", size=13)
@@ -992,11 +1025,13 @@ def add_no_data_page(pdf, page_title, source_file_name, selected_metrics, scale_
     pdf.ln(8)
     pdf.multi_cell(0, 6, "No data available for this chart window.")
 
+
 def build_site_pdf_report_bytes(site_name, site_df, selected_metrics, scale_mode, source_file_name, report_timestamp):
     safe_site = safe_filename(site_name)
     temp_dir = REPORT_DIR / "_temp_images"
     temp_dir.mkdir(parents=True, exist_ok=True)
     report_timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+
     chart_15_df = get_last_n_days_df(site_df, selected_metrics, 15)
     chart_2_df = get_last_n_days_df(site_df, selected_metrics, 2)
 
@@ -1050,7 +1085,7 @@ def build_site_pdf_report_bytes(site_name, site_df, selected_metrics, scale_mode
                 selected_metrics=selected_metrics,
                 scale_mode=scale_mode
             )
-        
+
         if img_2_path.exists():
             add_chart_page(
                 pdf=pdf,
@@ -1100,19 +1135,19 @@ def build_optimized_excel_report(
     temp_dir = REPORT_DIR / "temp_excel_images"
     temp_dir.mkdir(parents=True, exist_ok=True)
 
-    workingdf = filtered_long.copy()
-    workingdf["date"] = pd.to_datetime(workingdf["begin"]).dt.date
-    workingdf["hour"] = pd.to_datetime(workingdf["begin"]).dt.hour
-    workingdf["month"] = pd.to_datetime(workingdf["begin"]).dt.to_period("M").astype(str)
-    workingdf["weekday"] = pd.to_datetime(workingdf["begin"]).dt.day_name()
-    workingdf["timewindow"] = pd.cut(
-        workingdf["hour"],
+    working_df = filtered_long.copy()
+    working_df["date"] = pd.to_datetime(working_df["begin"]).dt.date
+    working_df["hour"] = pd.to_datetime(working_df["begin"]).dt.hour
+    working_df["month"] = pd.to_datetime(working_df["begin"]).dt.to_period("M").astype(str)
+    working_df["weekday"] = pd.to_datetime(working_df["begin"]).dt.day_name()
+    working_df["timewindow"] = pd.cut(
+        working_df["hour"],
         bins=[-1, 5, 11, 17, 23],
         labels=["Night", "Morning", "Afternoon", "Evening"]
     )
 
     summary_df = (
-        workingdf.groupby(["site", "metric", "unit"], as_index=False)
+        working_df.groupby(["site", "metric", "unit"], as_index=False)
         .agg(
             count=("value", "count"),
             avg=("value", "mean"),
@@ -1127,8 +1162,8 @@ def build_optimized_excel_report(
     for col in ["avg", "min", "max", "total"]:
         summary_df[col] = summary_df[col].round(2)
 
-    pivotsiteavg = (
-        workingdf.pivot_table(
+    pivot_site_avg = (
+        working_df.pivot_table(
             index="site",
             columns="metric",
             values="value",
@@ -1138,8 +1173,8 @@ def build_optimized_excel_report(
         .reset_index()
     )
 
-    pivotdateavg = (
-        workingdf.pivot_table(
+    pivot_date_avg = (
+        working_df.pivot_table(
             index="date",
             columns="metric",
             values="value",
@@ -1149,7 +1184,7 @@ def build_optimized_excel_report(
         .reset_index()
     )
 
-    dashboardinfo = pd.DataFrame({
+    dashboard_info = pd.DataFrame({
         "Field": [
             "Source File",
             "Generated On",
@@ -1165,123 +1200,121 @@ def build_optimized_excel_report(
             datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             scale_mode,
             ", ".join(selected_metrics),
-            workingdf["site"].nunique(),
-            len(workingdf),
-            str(workingdf["begin"].min()),
-            str(workingdf["begin"].max())
+            working_df["site"].nunique(),
+            len(working_df),
+            str(working_df["begin"].min()),
+            str(working_df["begin"].max())
         ]
     })
 
-    chartfiles = []
-    chartpositions = ["A10", "A32", "A54", "A76"]
-    chartdatablocks = []
+    chart_files = []
+    chart_positions = ["A10", "A32", "A54", "A76"]
+    chart_data_blocks = []
 
-    sitesforcharts = displayed_sites if displayed_sites else sorted(workingdf["site"].dropna().unique().tolist())
+    sites_for_charts = displayed_sites if displayed_sites else sorted(working_df["site"].dropna().unique().tolist())
 
-    for site in sitesforcharts[:4]:
-        sitedf = workingdf[workingdf["site"] == site].copy()
-        if sitedf.empty:
+    for site in sites_for_charts[:4]:
+        site_df = working_df[working_df["site"] == site].copy()
+        if site_df.empty:
             continue
 
-        sitestate = (site_view_states or {}).get(site, {})
-        current_mode = sitestate.get("mode", "15 Day")
+        site_state = (site_view_states or {}).get(site, {})
+        current_mode = site_state.get("mode", "15 Day")
 
         if current_mode == "Custom":
-            custom_start_date = sitestate.get("custom_start_date")
-            custom_end_date = sitestate.get("custom_end_date")
-            custom_start_time = sitestate.get("custom_start_time")
-            custom_end_time = sitestate.get("custom_end_time")
+            custom_start_date = site_state.get("custom_start_date")
+            custom_end_date = site_state.get("custom_end_date")
+            custom_start_time = site_state.get("custom_start_time")
+            custom_end_time = site_state.get("custom_end_time")
 
             if all(x is not None for x in [custom_start_date, custom_end_date, custom_start_time, custom_end_time]):
                 custom_start_dt = pd.Timestamp(datetime.combine(custom_start_date, custom_start_time))
                 custom_end_dt = pd.Timestamp(datetime.combine(custom_end_date, custom_end_time))
-                range_df = getcustomrange_df(sitedf, selected_metrics, custom_start_dt, custom_end_dt)
+                range_df = get_custom_range_df(site_df, selected_metrics, custom_start_dt, custom_end_dt)
                 title_suffix = f"Custom Range | {custom_start_dt} to {custom_end_dt}"
             else:
-                range_df = getlastndaysdf(sitedf, selected_metrics, 15)
+                range_df = get_last_n_days_df(site_df, selected_metrics, 15)
                 title_suffix = "Last 15 Days"
         elif current_mode == "2 Day":
-            range_df = getlastndaysdf(sitedf, selected_metrics, 2)
+            range_df = get_last_n_days_df(site_df, selected_metrics, 2)
             title_suffix = "Last 2 Days"
         else:
-            range_df = getlastndaysdf(sitedf, selected_metrics, 15)
+            range_df = get_last_n_days_df(site_df, selected_metrics, 15)
             title_suffix = "Last 15 Days"
 
         if range_df.empty:
             continue
 
-        fig = buildcombinedchart(
+        fig = build_combined_chart(
             range_df,
             site,
             scale_mode,
-            f"excel_{safefilename(site)}_{report_timestamp}",
-            title_suffix
+            chart_id=f"excel_{safe_filename(site)}_{report_timestamp}",
+            title_suffix=title_suffix
         )
-
         if fig is None:
             continue
 
-        imgpath = temp_dir / f"{safefilename(site)}_{report_timestamp}.png"
-        fig.write_image(str(imgpath), format="png", width=1600, height=900)
-        chartfiles.append(imgpath)
-        chartdatablocks.append((site, imgpath))
+        img_path = temp_dir / f"{safe_filename(site)}_{report_timestamp}.png"
+        fig.write_image(str(img_path), format="png", width=1600, height=900)
+        chart_files.append(img_path)
+        chart_data_blocks.append((site, img_path))
 
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
-        workingdf.to_excel(writer, sheet_name="CleanData", index=False)
+        working_df.to_excel(writer, sheet_name="CleanData", index=False)
         summary_df.to_excel(writer, sheet_name="Summary", index=False)
-        pivotsiteavg.to_excel(writer, sheet_name="PivotSiteAvg", index=False)
-        pivotdateavg.to_excel(writer, sheet_name="PivotDateAvg", index=False)
-        dashboardinfo.to_excel(writer, sheet_name="Dashboard", index=False, startrow=0)
+        pivot_site_avg.to_excel(writer, sheet_name="PivotSiteAvg", index=False)
+        pivot_date_avg.to_excel(writer, sheet_name="PivotDateAvg", index=False)
+        dashboard_info.to_excel(writer, sheet_name="Dashboard", index=False, startrow=0)
 
     output.seek(0)
     wb = load_workbook(output)
 
-    headerfill = PatternFill("solid", fgColor="1F4E78")
-    headerfont = Font(color="FFFFFF", bold=True, size=11)
+    header_fill = PatternFill("solid", fgColor="1F4E78")
+    header_font = Font(color="FFFFFF", bold=True, size=11)
     thin = Side(style="thin", color="D9E2EC")
     border = Border(left=thin, right=thin, top=thin, bottom=thin)
-
-    heatrule = ColorScaleRule(
+    heat_rule = ColorScaleRule(
         start_type="min", start_color="63BE7B",
         mid_type="percentile", mid_value=50, mid_color="FFEB84",
         end_type="max", end_color="F8696B"
     )
 
-    def stylesheet(ws, freeze="A2"):
+    def style_sheet(ws, freeze="A2"):
         ws.freeze_panes = freeze
         for cell in ws[1]:
-            cell.fill = headerfill
-            cell.font = headerfont
+            cell.fill = header_fill
+            cell.font = header_font
             cell.alignment = Alignment(horizontal="center", vertical="center")
             cell.border = border
 
         for col in ws.columns:
-            maxlen = 0
-            colletter = get_column_letter(col[0].column)
+            max_len = 0
+            col_letter = get_column_letter(col[0].column)
             for cell in col[:300]:
                 try:
                     if cell.value is not None:
-                        maxlen = max(maxlen, len(str(cell.value)))
+                        max_len = max(max_len, len(str(cell.value)))
                 except Exception:
                     pass
-            ws.column_dimensions[colletter].width = min(maxlen + 3, 28)
+            ws.column_dimensions[col_letter].width = min(max_len + 3, 28)
 
     for sheet_name in ["CleanData", "Summary", "PivotSiteAvg", "PivotDateAvg"]:
         ws = wb[sheet_name]
-        stylesheet(ws)
+        style_sheet(ws)
 
     for sheet_name in ["PivotSiteAvg", "PivotDateAvg"]:
         ws = wb[sheet_name]
         if ws.max_row > 1 and ws.max_column > 1:
             ws.conditional_formatting.add(
                 f"B2:{get_column_letter(ws.max_column)}{ws.max_row}",
-                heatrule
+                heat_rule
             )
 
     for sheet_name in ["CleanData", "Summary"]:
         ws = wb[sheet_name]
-        tableref = f"A1:{get_column_letter(ws.max_column)}{ws.max_row}"
-        tab = Table(displayName=f"Tbl{sheet_name}", ref=tableref)
+        table_ref = f"A1:{get_column_letter(ws.max_column)}{ws.max_row}"
+        tab = Table(displayName=f"Tbl{sheet_name}", ref=table_ref)
         tab.tableStyleInfo = TableStyleInfo(
             name="TableStyleMedium2",
             showFirstColumn=False,
@@ -1291,43 +1324,41 @@ def build_optimized_excel_report(
         )
         ws.add_table(tab)
 
-    dashboardws = wb["Dashboard"]
-    dashboardws["A1"] = "Optimized Meteorological Dashboard"
-    dashboardws["A1"].font = Font(bold=True, size=16, color="1F1F1F")
-    dashboardws["A2"] = "Filtered export from current dashboard selection"
-    dashboardws["A2"].font = Font(italic=True, size=10, color="6B778C")
-    dashboardws.column_dimensions["A"].width = 24
-    dashboardws.column_dimensions["B"].width = 40
+    dashboard_ws = wb["Dashboard"]
+    dashboard_ws["A1"] = "Optimized Meteorological Dashboard"
+    dashboard_ws["A1"].font = Font(bold=True, size=16, color="1F1F1F")
+    dashboard_ws["A2"] = "Filtered export from current dashboard selection"
+    dashboard_ws["A2"].font = Font(italic=True, size=10, color="6B778C")
+    dashboard_ws.column_dimensions["A"].width = 24
+    dashboard_ws.column_dimensions["B"].width = 40
 
-    for idx, (site, imgpath) in enumerate(chartdatablocks):
-        if idx >= len(chartpositions):
+    for idx, (site, img_path) in enumerate(chart_data_blocks):
+        if idx >= len(chart_positions):
             break
-        anchor = chartpositions[idx]
-        img = XLImage(str(imgpath))
+        anchor = chart_positions[idx]
+        img = XLImage(str(img_path))
         img.width = 520
         img.height = 290
-        dashboardws.add_image(img, anchor)
+        dashboard_ws.add_image(img, anchor)
 
-    finaloutput = BytesIO()
-    wb.save(finaloutput)
-    finaloutput.seek(0)
+    final_output = BytesIO()
+    wb.save(final_output)
+    final_output.seek(0)
 
-    for imgpath in chartfiles:
+    for img_path in chart_files:
         try:
-            if imgpath.exists():
-                imgpath.unlink()
+            if img_path.exists():
+                img_path.unlink()
         except Exception:
             pass
 
-    return finaloutput.getvalue()
+    return final_output.getvalue()
 
-# =========================================================
-# STATE
-# =========================================================
+
 def init_dashboard_state(current_hash, sites, metrics):
     default_metrics = [m for m in ["Wind Speed", "Wind Direction"] if m in metrics]
     if not default_metrics and metrics:
-        default_metrics = [metrics[0]]
+        default_metrics = metrics[:1]
 
     if st.session_state.get("loaded_file_hash") != current_hash:
         st.session_state["loaded_file_hash"] = current_hash
@@ -1349,6 +1380,7 @@ def init_dashboard_state(current_hash, sites, metrics):
     st.session_state.setdefault("site_view_state", {})
     st.session_state.setdefault("generated_site_pdfs", [])
 
+
 def ensure_site_state(site, site_min, site_max):
     if site not in st.session_state["site_view_state"]:
         st.session_state["site_view_state"][site] = {
@@ -1359,8 +1391,9 @@ def ensure_site_state(site, site_min, site_max):
             "custom_end_time": time(23, 59)
         }
 
+
 # =========================================================
-# HEADER
+# UI
 # =========================================================
 st.markdown("""
 <div class="main-shell">
@@ -1371,16 +1404,14 @@ st.markdown("""
             Focused on clean charting, fast filtering, and minimal on-screen clutter.
         </div>
         <span class="pill">Compact UI</span>
-        <span class="pill">Instant 15/2 Day</span>
+        <span class="pill">Instant 15/2 Days</span>
         <span class="pill">Custom Range View</span>
         <span class="pill">Per-Site PDF Reports</span>
     </div>
 </div>
 """, unsafe_allow_html=True)
 
-# =========================================================
-# SIDEBAR
-# =========================================================
+# Sidebar
 st.sidebar.markdown("### Data Input")
 uploaded_file = st.sidebar.file_uploader("Upload CSV / Excel", type=["csv", "xlsx", "xls"])
 show_summary_tables = st.sidebar.toggle("Show metric summaries", value=False)
@@ -1399,9 +1430,6 @@ if uploaded_file is None:
             )
     st.stop()
 
-# =========================================================
-# PROCESS FILE
-# =========================================================
 try:
     file_bytes = uploaded_file.getvalue()
     with st.spinner("Processing uploaded file..."):
@@ -1423,29 +1451,24 @@ metrics = sorted(long_df["metric"].dropna().unique().tolist())
 init_dashboard_state(current_hash, sites, metrics)
 applied = st.session_state["applied_filters"]
 
-# =========================================================
-# FILTERS
-# =========================================================
 st.sidebar.markdown("### Analysis Controls")
 with st.sidebar.form("dashboard_filter_form"):
     form_scale_mode = st.selectbox(
         "Combined graph scale",
         ["Normalized (0-100)", "Actual Values"],
-        index=["Normalized (0-100)", "Actual Values"].index(applied["scale_mode"]) if applied["scale_mode"] in ["Normalized (0-100)", "Actual Values"] else 0
+        index=["Normalized (0-100)", "Actual Values"].index(applied["scale_mode"])
+        if applied["scale_mode"] in ["Normalized (0-100)", "Actual Values"] else 0
     )
-
     form_selected_metrics = st.multiselect(
         "Parameters",
         options=metrics,
         default=[m for m in applied["selected_metrics"] if m in metrics]
     )
-
     form_displayed_sites = st.multiselect(
         "Sites",
         options=sites,
         default=[s for s in applied["displayed_sites"] if s in sites]
     )
-
     form_report_sites = st.multiselect(
         "Report sites",
         options=sites,
@@ -1461,20 +1484,19 @@ if view_dashboard:
         "displayed_sites": form_displayed_sites,
         "report_sites": form_report_sites
     }
-    applied = st.session_state["applied_filters"]
 
+applied = st.session_state["applied_filters"]
 scale_mode = applied["scale_mode"]
 selected_metrics = applied["selected_metrics"]
 displayed_sites = applied["displayed_sites"]
 selected_sites_for_reports = applied["report_sites"]
 
 filtered_long = long_df[
-    (long_df["site"].isin(selected_sites_for_reports)) &
-    (long_df["metric"].isin(selected_metrics))
+    long_df["site"].isin(selected_sites_for_reports) &
+    long_df["metric"].isin(selected_metrics)
 ].copy()
 
 summary_tables = {}
-
 if show_summary_tables and selected_metrics:
     st.markdown('<div class="section-label">Metric Summaries</div>', unsafe_allow_html=True)
     for metric in selected_metrics:
@@ -1486,28 +1508,23 @@ if show_summary_tables and selected_metrics:
         unit = unit_mode.iloc[0] if len(unit_mode) > 0 else ""
         summary_df = make_metric_summary(metric_df)
         summary_tables[metric] = summary_df
-
         insights = build_insights(metric_df, metric, unit)
+
         with st.expander(f"{metric} summary", expanded=False):
             for item in insights:
                 st.write(f"- {item}")
             st.dataframe(summary_df, use_container_width=True, hide_index=True)
 
-# =========================================================
-# TOP NOTE
-# =========================================================
 st.markdown("""
 <div class="subtle-note">
-Apply filters from the sidebar, then use <b>View Dashboard</b>. Each site card supports 15 Day, 2 Day, and Custom views.
+Apply filters from the sidebar, then use <b>View Dashboard</b>.
+Each site card supports 15 Day, 2 Day, and Custom views.
 The PDF generator creates one PDF per selected report site and includes exactly two charts per PDF: 15 Day and 2 Day.
 </div>
 """, unsafe_allow_html=True)
 
 st.markdown('<div class="section-label">Site Analysis</div>', unsafe_allow_html=True)
 
-# =========================================================
-# SITE CARDS
-# =========================================================
 if not selected_metrics:
     st.warning("Please select at least one parameter and click View Dashboard.")
 else:
@@ -1519,6 +1536,7 @@ else:
         site_min = site_df["begin"].min()
         site_max = site_df["begin"].max()
         ensure_site_state(site, site_min, site_max)
+
         site_state = st.session_state["site_view_state"][site]
         safe_site = safe_filename(site)
 
@@ -1526,31 +1544,42 @@ else:
         chips_html = "".join([f'<span class="metric-chip">{m}</span>' for m in metrics_present])
 
         st.markdown('<div class="site-shell">', unsafe_allow_html=True)
-        st.markdown(f"""
+        st.markdown(
+            f"""
             <div class="site-title">{site}</div>
-            <div class="site-subtitle">Available range: {str(site_min)[:16] if pd.notna(site_min) else "-"} to {str(site_max)[:16] if pd.notna(site_max) else "-"}</div>
+            <div class="site-subtitle">
+                Available range: {str(site_min)[:16] if pd.notna(site_min) else "-"} to {str(site_max)[:16] if pd.notna(site_max) else "-"}
+            </div>
             <div style="margin-top:4px;">{chips_html}</div>
-        """, unsafe_allow_html=True)
+            """,
+            unsafe_allow_html=True
+        )
 
         current_mode = st.radio(
             "View range",
             options=["15 Day", "2 Day", "Custom"],
-            index=["15 Day", "2 Day", "Custom"].index(site_state["mode"]) if site_state["mode"] in ["15 Day", "2 Day", "Custom"] else 0,
+            index=["15 Day", "2 Day", "Custom"].index(site_state["mode"])
+            if site_state["mode"] in ["15 Day", "2 Day", "Custom"] else 0,
             horizontal=True,
             key=f"{safe_site}_mode_radio",
             label_visibility="collapsed"
         )
-        site_state["mode"] = current_mode
 
+        site_state["mode"] = current_mode
         st.markdown(
             f'<div style="margin:6px 0 10px 0;"><span class="range-badge">Current View: {site_state["mode"]}</span></div>',
             unsafe_allow_html=True
         )
 
         if current_mode == "Custom":
-            st.markdown('<div class="helper-note">Choose dates and time, then click <b>View Custom Range</b>.</div>', unsafe_allow_html=True)
+            st.markdown(
+                '<div class="helper-note">Choose dates and time, then click <b>View Custom Range</b>.</div>',
+                unsafe_allow_html=True
+            )
+
             with st.form(f"custom_form_{safe_site}"):
                 c1, c2, c3, c4 = st.columns(4)
+
                 with c1:
                     custom_start_date = st.date_input(
                         "Start date",
@@ -1579,6 +1608,7 @@ else:
                         value=site_state["custom_end_time"],
                         key=f"{safe_site}_custom_end_time_widget"
                     )
+
                 view_custom = st.form_submit_button("View Custom Range", use_container_width=True)
 
             if view_custom:
@@ -1597,22 +1627,29 @@ else:
             else:
                 range_df = get_custom_range_df(site_df, selected_metrics, custom_start_dt, custom_end_dt)
                 title_suffix = f"Custom Range | {custom_start_dt} to {custom_end_dt}"
+
         elif current_mode == "2 Day":
             range_df = get_last_n_days_df(site_df, selected_metrics, 2)
             title_suffix = "Last 2 Days"
+
         else:
             range_df = get_last_n_days_df(site_df, selected_metrics, 15)
             title_suffix = "Last 15 Days"
 
-            fig = build_combined_chart(
-                site_df,
-                site,
-                scale_mode,
-                
-            )
+        fig = build_combined_chart(
+            range_df,
+            site,
+            scale_mode,
+            chart_id=f"{safe_site}_{current_mode}_{scale_mode}",
+            title_suffix=title_suffix
+        )
 
         if fig is not None:
-            st.plotly_chart(fig, use_container_width=True, config={"displaylogo": False, "responsive": True})
+            st.plotly_chart(
+                fig,
+                use_container_width=True,
+                config={"displaylogo": False, "responsive": True}
+            )
         else:
             st.info("No data available for the current site view.")
 
@@ -1632,11 +1669,8 @@ else:
             else:
                 st.dataframe(summary_df, use_container_width=True, hide_index=True)
 
-        st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
-# =========================================================
-# GENERATE SITE PDFS
-# =========================================================
 st.markdown('<div class="section-label">Generate Site PDFs</div>', unsafe_allow_html=True)
 
 if st.button("Generate Site PDF Reports"):
@@ -1646,7 +1680,7 @@ if st.button("Generate Site PDF Reports"):
         st.warning("Please select at least one report site before generating PDFs.")
     else:
         generated_reports = []
-        report_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        report_timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
 
         with st.spinner("Generating site PDF reports..."):
             for site in selected_sites_for_reports:
@@ -1667,7 +1701,6 @@ if st.button("Generate Site PDF Reports"):
                         source_file_name=uploaded_file.name,
                         report_timestamp=report_timestamp
                     )
-
                     pdf_name = f"{safe_filename(site)}_{report_timestamp}.pdf"
                     pdf_path = REPORT_DIR / pdf_name
 
@@ -1676,8 +1709,8 @@ if st.button("Generate Site PDF Reports"):
 
                     generated_reports.append({
                         "site": site,
-                        "file_name": pdf_name,
-                        "path": str(pdf_path),
+                        "filename": pdf_name,
+                        "path": str(pdf_path)
                     })
 
                 except Exception as e:
@@ -1686,7 +1719,7 @@ if st.button("Generate Site PDF Reports"):
         st.session_state["generated_site_pdfs"] = generated_reports
 
         if generated_reports:
-            st.success(f"Generated {len(generated_reports)} site PDF report(s) in: {REPORT_DIR}")
+            st.success(f"Generated {len(generated_reports)} site PDF reports in REPORT_DIR.")
         else:
             st.warning("No site PDFs were generated.")
 
@@ -1703,24 +1736,20 @@ if st.button("Generate Optimized Excel"):
                 filtered_long=filtered_long,
                 selected_metrics=selected_metrics,
                 scale_mode=scale_mode,
-                source_filename=uploaded_file.name,
-                site_view_states=st.session_state.get("site_view_state", {})
+                source_file_name=uploaded_file.name,
+                site_view_states=st.session_state.get("site_view_state"),
+                displayed_sites=displayed_sites
             )
 
-        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-        excel_name = f"Optimized_Meteo_Report_{timestamp}.xlsx"
-
+        excel_name = f"Optimized_Meteo_Report_{datetime.now().strftime('%Y%m%d%H%M%S')}.xlsx"
         st.download_button(
             label="Download Optimized Excel",
             data=excel_bytes,
-            file_name=excel_name,
+            filename=excel_name,
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True
         )
 
-# =========================================================
-# PDF DOWNLOADS
-# =========================================================
 generated_site_pdfs = st.session_state.get("generated_site_pdfs", [])
 
 if generated_site_pdfs:
@@ -1728,65 +1757,52 @@ if generated_site_pdfs:
 
     for report in generated_site_pdfs:
         c1, c2 = st.columns([2.4, 1])
+
         with c1:
-            st.write(f"{report['site']}")
+            st.write(report["site"])
             st.caption(report["path"])
+
         with c2:
             pdf_path = report["path"]
+            with open(pdf_path, "rb") as pdf_file:
+                pdf_data = pdf_file.read()
 
-        with open(pdf_path, "rb") as pdf_file:
-            pdf_data = pdf_file.read()
-        
-        st.download_button(
-            label=f"Download {report['site']} PDF",
-            data=pdf_data,
-            file_name=report["file_name"],
-            mime="application/pdf",
-            key=f"download_{safe_filename(report['site'])}_{report['file_name']}",
-            use_container_width=True
-        )
+            st.download_button(
+                label=f"Download {report['site']} PDF",
+                data=pdf_data,
+                filename=report["filename"],
+                mime="application/pdf",
+                key=f"download_{safe_filename(report['site'])}_{report['filename']}",
+                use_container_width=True
+            )
 
-st.markdown("### Email Reports")
+    st.markdown("### Email Reports")
+    email_recipients_input = st.text_area("Recipient emails comma separated", value="")
+    email_subject = st.text_input("Email subject", value="Meteorological Site Reports")
+    email_body = st.text_area(
+        "Email body",
+        value="Please find attached the generated meteorological site PDF reports."
+    )
 
-email_recipients_input = st.text_area(
-    "Recipient emails (comma separated)",
-    value=""
-)
-
-email_subject = st.text_input(
-    "Email subject",
-    value="Meteorological Site Reports"
-)
-
-email_body = st.text_area(
-    "Email body",
-    value="Please find attached the generated meteorological site PDF reports."
-)
-
-if st.button("Send Email With All Reports"):
-    if not generated_site_pdfs:
-        st.warning("No generated reports available to email.")
-    else:
-        to_emails = [e.strip() for e in email_recipients_input.split(",") if e.strip()]
-
-        if not to_emails:
-            st.warning("Please enter at least one recipient email.")
+    if st.button("Send Email With All Reports"):
+        if not generated_site_pdfs:
+            st.warning("No generated reports available to email.")
         else:
-            try:
-                send_reports_email_gmail(
-                    to_emails=to_emails,
-                    subject=email_subject,
-                    body=email_body,
-                    reports=generated_site_pdfs
-                )
-                st.success("Email sent successfully with all attached reports.")
-            except Exception as e:
-                st.error(f"Email failed: {e}")
+            to_emails = [e.strip() for e in email_recipients_input.split(",") if e.strip()]
+            if not to_emails:
+                st.warning("Please enter at least one recipient email.")
+            else:
+                try:
+                    send_reports_email_gmail(
+                        to_emails=to_emails,
+                        subject=email_subject,
+                        body=email_body,
+                        reports=generated_site_pdfs
+                    )
+                    st.success("Email sent successfully with all attached reports.")
+                except Exception as e:
+                    st.error(f"Email failed: {e}")
 
-
-# =========================================================
-# OPTIONAL DATA VIEWS
-# =========================================================
 if show_raw:
     st.markdown('<div class="section-label">Processed Raw Data</div>', unsafe_allow_html=True)
     st.dataframe(filtered_long, use_container_width=True, hide_index=True)
