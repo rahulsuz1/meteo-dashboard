@@ -324,7 +324,7 @@ def send_reports_email_gmail(to_emails, subject, body, reports):
 
     for report in reports:
         pdf_path = report["path"]
-        file_name = report["filename"]
+        file_name = report["file_name"]
 
         with open(pdf_path, "rb") as f:
             pdf_data = f.read()
@@ -333,7 +333,7 @@ def send_reports_email_gmail(to_emails, subject, body, reports):
             pdf_data,
             maintype="application",
             subtype="pdf",
-            filename=file_name
+            file_name=file_name
         )
 
     with smtplib.SMTP("smtp.gmail.com", 587) as server:
@@ -344,7 +344,7 @@ def send_reports_email_gmail(to_emails, subject, body, reports):
         server.send_message(msg)
 
 
-def safe_filename(name: str) -> str:
+def safe_file_name(name: str) -> str:
     return re.sub(r"[^A-Za-z0-9_.-]+", "_", str(name))
 
 
@@ -480,7 +480,7 @@ def save_upload_bundle(uploaded_file, file_bytes, wide_df, long_df):
     day_folder = UPLOAD_DIR / ts.strftime("%Y-%m-%d")
     day_folder.mkdir(parents=True, exist_ok=True)
 
-    cleaned_name = safe_filename(uploaded_file.name)
+    cleaned_name = safe_file_name(uploaded_file.name)
     base_name = Path(cleaned_name).stem
 
     raw_path = day_folder / f"{stamp}_{cleaned_name}"
@@ -1027,7 +1027,7 @@ def add_no_data_page(pdf, page_title, source_file_name, selected_metrics, scale_
 
 
 def build_site_pdf_report_bytes(site_name, site_df, selected_metrics, scale_mode, source_file_name, report_timestamp):
-    safe_site = safe_filename(site_name)
+    safe_site = safe_file_name(site_name)
     temp_dir = REPORT_DIR / "_temp_images"
     temp_dir.mkdir(parents=True, exist_ok=True)
     report_timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
@@ -1249,13 +1249,13 @@ def build_optimized_excel_report(
             range_df,
             site,
             scale_mode,
-            chart_id=f"excel_{safe_filename(site)}_{report_timestamp}",
+            chart_id=f"excel_{safe_file_name(site)}_{report_timestamp}",
             title_suffix=title_suffix
         )
         if fig is None:
             continue
 
-        img_path = temp_dir / f"{safe_filename(site)}_{report_timestamp}.png"
+        img_path = temp_dir / f"{safe_file_name(site)}_{report_timestamp}.png"
         fig.write_image(str(img_path), format="png", width=1600, height=900)
         chart_files.append(img_path)
         chart_data_blocks.append((site, img_path))
@@ -1538,7 +1538,7 @@ else:
         ensure_site_state(site, site_min, site_max)
 
         site_state = st.session_state["site_view_state"][site]
-        safe_site = safe_filename(site)
+        safe_site = safe_file_name(site)
 
         metrics_present = sorted(site_df[site_df["metric"].isin(selected_metrics)]["metric"].dropna().unique().tolist())
         chips_html = "".join([f'<span class="metric-chip">{m}</span>' for m in metrics_present])
@@ -1701,7 +1701,7 @@ if st.button("Generate Site PDF Reports"):
                         source_file_name=uploaded_file.name,
                         report_timestamp=report_timestamp
                     )
-                    pdf_name = f"{safe_filename(site)}_{report_timestamp}.pdf"
+                    pdf_name = f"{safe_file_name(site)}_{report_timestamp}.pdf"
                     pdf_path = REPORT_DIR / pdf_name
 
                     with open(pdf_path, "wb") as f:
@@ -1709,7 +1709,7 @@ if st.button("Generate Site PDF Reports"):
 
                     generated_reports.append({
                         "site": site,
-                        "filename": pdf_name,
+                        "file_name": pdf_name,
                         "path": str(pdf_path)
                     })
 
@@ -1745,7 +1745,7 @@ if st.button("Generate Optimized Excel"):
         st.download_button(
             label="Download Optimized Excel",
             data=excel_bytes,
-            filename=excel_name,
+            file_name=excel_name,
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True
         )
@@ -1770,9 +1770,9 @@ if generated_site_pdfs:
             st.download_button(
                 label=f"Download {report['site']} PDF",
                 data=pdf_data,
-                filename=report["filename"],
+                file_name=report["file_name"],
                 mime="application/pdf",
-                key=f"download_{safe_filename(report['site'])}_{report['filename']}",
+                key=f"download_{safe_file_name(report['site'])}_{report['file_name']}",
                 use_container_width=True
             )
 
