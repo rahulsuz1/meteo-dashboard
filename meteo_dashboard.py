@@ -1417,6 +1417,14 @@ def build_refined_output_df(long_df):
     if "begin" in df.columns:
         out["begin"] = df["begin"]
         out["Begin"] = df["begin"]
+        out["hour"] = df["begin"].dt.hour
+        out["month"] = df["begin"].dt.to_period("M").astype(str)
+        out["weekday"] = df["begin"].dt.day_name()
+        out["timewindow"] = pd.cut(
+            df["begin"].dt.hour,
+            bins=[-1, 5, 11, 17, 23],
+            labels=["Night", "Morning", "Afternoon", "Evening"]
+        )
 
     if "end" in df.columns:
         out["end"] = df["end"]
@@ -1448,7 +1456,6 @@ def build_refined_output_df(long_df):
 
     out = out.loc[:, ~out.columns.duplicated()]
     return out
-
 
 def map_to_master_headers(refined_df, master_headers):
     src_cols = list(refined_df.columns)
