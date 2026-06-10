@@ -812,39 +812,40 @@ def build_combined_chart(df, site_name, scale_mode, chart_id=None, title_suffix=
     full_title = f"{site_name} | {title_suffix}" if title_suffix else site_name
 
     fig.update_layout(
-    title=full_title,
-    template="plotly_white",
-    height=420,
-    margin=dict(l=10, r=10, t=35, b=140),
-    legend=dict(
-        orientation="h",
-        yanchor="top",
-        y=-0.30,
-        xanchor="center",
-        x=0.5,
-        bgcolor="rgba(255,255,255,0.0)",
-        font=dict(size=10)
-    ),
-    legend_title="",
-    hovermode="x unified",
-    paper_bgcolor="rgba(0,0,0,0)",
-    plot_bgcolor="#FFFFFF",
-    uirevision=chart_id or f"{site_name}_{scale_mode}",
-    font=dict(color="#172B4D")
-)
+        title=full_title,
+        template="plotly_white",
+        height=420,
+        margin=dict(l=10, r=10, t=35, b=140),
+        legend=dict(
+            orientation="h",
+            yanchor="top",
+            y=-0.30,
+            xanchor="center",
+            x=0.5,
+            bgcolor="rgba(255,255,255,0.0)",
+            font=dict(size=10)
+        ),
+        legend_title="",
+        hovermode="x unified",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="#FFFFFF",
+        uirevision=chart_id or f"{site_name}_{scale_mode}",
+        font=dict(color="#172B4D")
+    )
 
-fig.update_xaxes(
-    title=dict(
-        text="Timestamp",
-        standoff=18
-    ),
-    showgrid=True,
-    gridcolor="#E7EEF5",
-    zeroline=False,
-    showline=True,
-    linecolor="#D9E2EC",
-    automargin=True
-)
+    fig.update_xaxes(
+        title=dict(
+            text="Timestamp",
+            standoff=18
+        ),
+        showgrid=True,
+        gridcolor="#E7EEF5",
+        zeroline=False,
+        showline=True,
+        linecolor="#D9E2EC",
+        automargin=True
+    )
+
     fig.update_yaxes(
         title=y_title,
         showgrid=True,
