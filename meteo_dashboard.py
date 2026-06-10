@@ -340,7 +340,7 @@ def apply_clean_data_table(ws):
         showColumnStripes=False
     )
     ws.add_table(tab)
-
+master_template_path = Path("Master-file.xlsx")
 wb = load_workbook(master_template_path)
 clean_ws = wb["Clean Data"]
 
