@@ -11,28 +11,12 @@ from datetime import datetime, time
 from fpdf import FPDF
 import smtplib
 from email.message import EmailMessage
-from copy import copy
 from openpyxl import load_workbook
 from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 from openpyxl.formatting.rule import ColorScaleRule
 from openpyxl.worksheet.table import Table, TableStyleInfo
 from openpyxl.drawing.image import Image as XLImage
 from openpyxl.utils import get_column_letter
-
-
-class ReportPDF(FPDF):
-    def footer(self):
-        self.set_y(-12)
-        self.set_font("Helvetica", size=8)
-        self.set_text_color(120, 120, 120)
-        self.cell(
-            0,
-            6,
-            "Developed by : Dhruv Pathak and Rahul Singh",
-            0,
-            0,
-            "R"
-        )
 
 
 # =========================================================
@@ -44,6 +28,9 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
+# =========================================================
+# STATIC UI
+# =========================================================
 st.markdown("""
 <style>
 .dev-credit {
@@ -60,25 +47,10 @@ st.markdown("""
     box-shadow: 0 2px 8px rgba(0,0,0,0.08);
     backdrop-filter: blur(6px);
 }
-</style>
-
-<div class="dev-credit">
-    Developed by : Dhruv Pathak and Rahul Singh
-</div>
-""", unsafe_allow_html=True)
-
-# =========================================================
-# STYLING
-# =========================================================
-st.markdown("""
-<style>
 .block-container {
-    padding-top: 2.4rem;
+    padding-top: 2.2rem;
     padding-bottom: 1rem;
     max-width: 97%;
-}
-.hero-panel {
-    margin-top: 0.8rem;
 }
 :root {
     --bg: #EFF4F9;
@@ -93,7 +65,6 @@ st.markdown("""
     --primary-dark: #1F5E8C;
     --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
     --shadow-md: 0 10px 24px rgba(15, 23, 42, 0.07);
-    --radius-lg: 22px;
 }
 html, body, [class*="css"] {
     font-family: "Segoe UI", Arial, sans-serif;
@@ -104,12 +75,7 @@ html, body, [class*="css"] {
         linear-gradient(180deg, rgba(63,169,245,0.12) 0%, rgba(239,244,249,1) 240px),
         var(--bg);
 }
-#MainMenu, footer {
-    visibility: visible !important;
-}
-.main-shell {
-    margin-bottom: 0.8rem;
-}
+.main-shell { margin-bottom: 0.8rem; }
 .hero-panel {
     background: linear-gradient(135deg, rgba(255,255,255,0.98) 0%, rgba(249,252,255,0.99) 100%);
     border: 1px solid rgba(217,226,236,0.95);
@@ -210,24 +176,6 @@ html, body, [class*="css"] {
     font-size: 0.82rem;
     margin: 0.25rem 0 0.7rem 0;
 }
-.small-panel {
-    background: linear-gradient(180deg, #FFFFFF 0%, #FCFDFE 100%);
-    border: 1px solid var(--line);
-    border-radius: 18px;
-    padding: 10px 12px;
-    box-shadow: var(--shadow-sm);
-}
-.small-title {
-    font-size: 0.84rem;
-    font-weight: 700;
-    color: var(--title);
-    margin-bottom: 0.35rem;
-}
-.small-caption {
-    color: var(--muted);
-    font-size: 0.76rem;
-    margin-bottom: 0.45rem;
-}
 div[data-testid="stMetric"] {
     background: linear-gradient(180deg, #FFFFFF 0%, #FBFCFE 100%);
     border: 1px solid var(--line);
@@ -235,16 +183,7 @@ div[data-testid="stMetric"] {
     padding: 8px 10px;
     box-shadow: var(--shadow-sm);
 }
-div[data-testid="stMetricLabel"] {
-    color: var(--muted) !important;
-    font-weight: 650 !important;
-}
-div[data-testid="stMetricValue"] {
-    color: var(--title) !important;
-    font-weight: 760 !important;
-}
-div[data-testid="stDataFrame"],
-div[data-testid="stExpander"] {
+div[data-testid="stDataFrame"], div[data-testid="stExpander"] {
     border: 1px solid var(--line);
     border-radius: 14px;
     overflow: hidden;
@@ -275,12 +214,11 @@ div[data-testid="stRadio"] label {
     padding: 6px 10px;
     border-radius: 10px;
 }
-hr {
-    border: none;
-    border-top: 1px solid var(--line-soft);
-    margin: 0.55rem 0;
-}
 </style>
+
+<div class="dev-credit">
+    Developed by : Dhruv Pathak and Rahul Singh
+</div>
 """, unsafe_allow_html=True)
 
 # =========================================================
@@ -291,15 +229,11 @@ UPLOAD_DIR = BASE_DIR / "data_uploads"
 PROCESSED_DIR = BASE_DIR / "processed"
 REPORT_DIR = BASE_DIR / "Meteorological Reports" / "Daily"
 LOG_FILE = BASE_DIR / "upload_log.csv"
+MASTER_TEMPLATE_NAME = "MASTER-file.xlsx"
+MASTER_SHEET_NAME = "Clean Data"
 
 for folder in [UPLOAD_DIR, PROCESSED_DIR, REPORT_DIR]:
     folder.mkdir(parents=True, exist_ok=True)
-
-# =========================================================
-# MASTER TEMPLATE CONFIG
-# =========================================================
-MASTER_TEMPLATE_NAME = "MASTER-file.xlsx"
-MASTER_SHEET_NAME = "clean data"
 
 # =========================================================
 # CONSTANTS
@@ -316,11 +250,21 @@ COLOR_MAP = {
     "Precipitation": "#9B7BF2"
 }
 
+
+# =========================================================
+# PDF CLASS
+# =========================================================
+class ReportPDF(FPDF):
+    def footer(self):
+        self.set_y(-12)
+        self.set_font("Helvetica", size=8)
+        self.set_text_color(120, 120, 120)
+        self.cell(0, 6, "Developed by : Dhruv Pathak and Rahul Singh", 0, 0, "R")
+
+
 # =========================================================
 # HELPERS
 # =========================================================
-
-
 def safe_file_name(name: str) -> str:
     return re.sub(r"[^A-Za-z0-9_.-]+", "_", str(name))
 
@@ -344,7 +288,10 @@ def append_upload_log(record: dict):
 
 def load_upload_log():
     if LOG_FILE.exists():
-        return pd.read_csv(LOG_FILE)
+        try:
+            return pd.read_csv(LOG_FILE)
+        except Exception:
+            return pd.DataFrame()
     return pd.DataFrame()
 
 
@@ -393,9 +340,9 @@ def parse_semicolon_table(lines):
     if end_col:
         df[end_col] = pd.to_datetime(df[end_col], dayfirst=True, errors="coerce")
 
-    for col in df.columns:
-        if col not in [begin_col, end_col]:
-            df[col] = pd.to_numeric(df[col], errors="coerce")
+    non_time_cols = [c for c in df.columns if c not in [begin_col, end_col]]
+    for col in non_time_cols:
+        df[col] = pd.to_numeric(df[col], errors="coerce")
 
     df = df.dropna(subset=[begin_col]).sort_values(begin_col).reset_index(drop=True)
     return df, begin_col, end_col
@@ -404,8 +351,15 @@ def parse_semicolon_table(lines):
 def wide_to_long(df, begin_col, end_col):
     id_vars = [begin_col] + ([end_col] if end_col else [])
     value_vars = [c for c in df.columns if c not in id_vars]
-    long_df = df.melt(id_vars=id_vars, value_vars=value_vars, var_name="parameter", value_name="value")
-    meta = long_df["parameter"].apply(lambda x: pd.Series(split_variable(x), index=["site", "metric", "unit"]))
+    long_df = df.melt(
+        id_vars=id_vars,
+        value_vars=value_vars,
+        var_name="parameter",
+        value_name="value"
+    )
+    meta = long_df["parameter"].apply(
+        lambda x: pd.Series(split_variable(x), index=["site", "metric", "unit"])
+    )
     long_df = pd.concat([long_df, meta], axis=1)
 
     rename_map = {begin_col: "begin"}
@@ -413,7 +367,9 @@ def wide_to_long(df, begin_col, end_col):
         rename_map[end_col] = "end"
 
     long_df = long_df.rename(columns=rename_map)
-    long_df = long_df.dropna(subset=["begin", "value"]).sort_values(["site", "metric", "begin"]).reset_index(drop=True)
+    long_df = long_df.dropna(subset=["begin", "value"]).sort_values(
+        ["site", "metric", "begin"]
+    ).reset_index(drop=True)
     return long_df
 
 
@@ -448,6 +404,7 @@ def prepare_long_df(long_df):
     df["site"] = df["site"].astype(str).str.strip()
     df["metric"] = df["metric"].astype(str).str.strip()
     df["unit"] = df["unit"].astype(str).replace("nan", "")
+    df["value"] = pd.to_numeric(df["value"], errors="coerce")
     return df.sort_values(["site", "metric", "begin"]).reset_index(drop=True)
 
 
@@ -498,12 +455,9 @@ def normalize_series(s):
 
 
 def get_filtered_site_metric_df(site_df, selected_metrics):
-    return (
-        site_df[site_df["metric"].isin(selected_metrics)]
-        .copy()
-        .dropna(subset=["begin"])
-        .sort_values("begin")
-    )
+    if site_df.empty or not selected_metrics:
+        return site_df.iloc[0:0]
+    return site_df.loc[site_df["metric"].isin(selected_metrics)].sort_values("begin")
 
 
 def get_last_n_days_df(site_df, selected_metrics, n_days):
@@ -512,14 +466,14 @@ def get_last_n_days_df(site_df, selected_metrics, n_days):
         return df
     max_ts = df["begin"].max()
     start_ts = max_ts - pd.Timedelta(days=n_days)
-    return df[df["begin"] >= start_ts].copy()
+    return df.loc[df["begin"] >= start_ts]
 
 
 def get_custom_range_df(site_df, selected_metrics, start_dt, end_dt):
     df = get_filtered_site_metric_df(site_df, selected_metrics)
     if df.empty or start_dt is None or end_dt is None:
-        return df.copy()
-    return df[(df["begin"] >= start_dt) & (df["begin"] <= end_dt)].copy()
+        return df
+    return df.loc[(df["begin"] >= start_dt) & (df["begin"] <= end_dt)]
 
 
 def build_latest_table(df):
@@ -544,7 +498,12 @@ def build_window_summary(df):
 
     summary_df = (
         df.groupby(["metric", "unit"], as_index=False)
-        .agg(avg=("value", "mean"), min=("value", "min"), max=("value", "max"), latest_time=("begin", "max"))
+        .agg(
+            avg=("value", "mean"),
+            min=("value", "min"),
+            max=("value", "max"),
+            latest_time=("begin", "max")
+        )
         .sort_values("metric")
         .reset_index(drop=True)
     )
@@ -592,11 +551,11 @@ def build_installation_daily_table(site_view_df):
     df["metric"] = df["metric"].astype(str).str.strip()
     df["date"] = pd.to_datetime(df["begin"]).dt.date
 
-    wind_df = df[df["metric"].str.lower() == "wind speed"].copy()
+    wind_df = df[df["metric"].str.lower() == "wind speed"]
     if wind_df.empty:
         return pd.DataFrame()
 
-    rain_df = df[df["metric"].str.lower() == "precipitation"].copy()
+    rain_df = df[df["metric"].str.lower() == "precipitation"]
 
     wind_unit_mode = wind_df["unit"].dropna().astype(str).mode()
     wind_unit = wind_unit_mode.iloc[0] if len(wind_unit_mode) > 0 else ""
@@ -724,46 +683,21 @@ def add_installation_insight_block(pdf, site_view_df):
     pdf.set_text_color(23, 43, 77)
     pdf.set_xy(info_x, card_y)
     pdf.set_font("Helvetica", "B", 8.5)
-    pdf.cell(
-        info_w,
-        5,
-        f"Best day: {pd.to_datetime(best['date']).strftime('%d %b %Y')}  |  Score {int(best['readiness_score'])}",
-        ln=True
-    )
+    pdf.cell(info_w, 5, f"Best day: {pd.to_datetime(best['date']).strftime('%d %b %Y')}  |  Score {int(best['readiness_score'])}", ln=True)
     pdf.set_x(info_x)
     pdf.set_font("Helvetica", "", 8)
-    pdf.cell(
-        info_w,
-        4.5,
-        f"Avg wind {best['wind_avg']:.1f} {wind_unit} | Peak wind {best['wind_max']:.1f} {wind_unit} | Rain {best['rain_total']:.1f} {rain_unit}",
-        ln=True
-    )
+    pdf.cell(info_w, 4.5, f"Avg wind {best['wind_avg']:.1f} {wind_unit} | Peak wind {best['wind_max']:.1f} {wind_unit} | Rain {best['rain_total']:.1f} {rain_unit}", ln=True)
 
     pdf.set_x(info_x)
     pdf.set_font("Helvetica", "B", 8.5)
-    pdf.cell(
-        info_w,
-        5,
-        f"Worst day: {pd.to_datetime(worst['date']).strftime('%d %b %Y')}  |  Score {int(worst['readiness_score'])}",
-        ln=True
-    )
+    pdf.cell(info_w, 5, f"Worst day: {pd.to_datetime(worst['date']).strftime('%d %b %Y')}  |  Score {int(worst['readiness_score'])}", ln=True)
     pdf.set_x(info_x)
     pdf.set_font("Helvetica", "", 8)
-    pdf.cell(
-        info_w,
-        4.5,
-        f"Avg wind {worst['wind_avg']:.1f} {wind_unit} | Peak wind {worst['wind_max']:.1f} {wind_unit} | Rain {worst['rain_total']:.1f} {rain_unit}",
-        ln=True
-    )
+    pdf.cell(info_w, 4.5, f"Avg wind {worst['wind_avg']:.1f} {wind_unit} | Peak wind {worst['wind_max']:.1f} {wind_unit} | Rain {worst['rain_total']:.1f} {rain_unit}", ln=True)
 
     pdf.set_x(info_x)
     pdf.set_font("Helvetica", "", 8)
-    pdf.cell(
-        info_w,
-        4.5,
-        f"Window count: Good {good_days} | Caution {caution_days} | Avoid {avoid_days}",
-        ln=True
-    )
+    pdf.cell(info_w, 4.5, f"Window count: Good {good_days} | Caution {caution_days} | Avoid {avoid_days}", ln=True)
 
     strip_y = card_y + 24
     strip_x = box_x + 3
@@ -841,7 +775,7 @@ def build_combined_chart(df, site_name, scale_mode, chart_id=None, title_suffix=
     if df.empty:
         return None
 
-    plot_df = df.copy().sort_values("begin")
+    plot_df = df.sort_values("begin").copy()
 
     if scale_mode == "Normalized (0-100)":
         plot_df["plot_value"] = plot_df.groupby("metric")["value"].transform(normalize_series)
@@ -855,7 +789,7 @@ def build_combined_chart(df, site_name, scale_mode, chart_id=None, title_suffix=
     fig = go.Figure()
 
     for metric in sorted(plot_df["metric"].dropna().unique()):
-        mdf = plot_df[plot_df["metric"] == metric].copy()
+        mdf = plot_df.loc[plot_df["metric"] == metric]
         if mdf.empty:
             continue
 
@@ -869,7 +803,7 @@ def build_combined_chart(df, site_name, scale_mode, chart_id=None, title_suffix=
             y=mdf["plot_value"],
             mode="lines",
             name=label,
-            line=dict(width=2.4, color=color, shape="spline", smoothing=0.35),
+            line=dict(width=2.0, color=color, shape="spline", smoothing=0.30),
             connectgaps=True,
             hovertemplate=f"<b>{label}</b><br>Time: %{{x}}<br>Value: %{{customdata:.2f}}<extra></extra>",
             customdata=mdf["value"]
@@ -880,12 +814,12 @@ def build_combined_chart(df, site_name, scale_mode, chart_id=None, title_suffix=
     fig.update_layout(
         title=full_title,
         template="plotly_white",
-        height=520,
-        margin=dict(l=10, r=10, t=35, b=110),
+        height=420,
+        margin=dict(l=10, r=10, t=35, b=95),
         legend=dict(
             orientation="h",
             yanchor="top",
-            y=-0.22,
+            y=-0.18,
             xanchor="center",
             x=0.5,
             bgcolor="rgba(255,255,255,0.0)",
@@ -988,12 +922,9 @@ def add_chart_page(pdf, page_title, image_path, source_file_name, selected_metri
     pdf.cell(0, 5, f"Scale mode: {scale_mode}", ln=True)
     pdf.cell(0, 5, f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", ln=True)
     pdf.ln(3)
-
     image_y = pdf.get_y()
-    image_w = 190
-    image_h = 107
-    pdf.image(str(image_path), x=10, y=image_y, w=image_w)
-    return image_y + image_h
+    pdf.image(str(image_path), x=10, y=image_y, w=190)
+    return image_y + 107
 
 
 def add_no_data_page(pdf, page_title, source_file_name, selected_metrics, scale_mode):
@@ -1012,7 +943,6 @@ def build_site_pdf_report_bytes(site_name, site_df, selected_metrics, scale_mode
     safe_site = safe_file_name(site_name)
     temp_dir = REPORT_DIR / "_temp_images"
     temp_dir.mkdir(parents=True, exist_ok=True)
-    report_timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
 
     chart_15_df = get_last_n_days_df(site_df, selected_metrics, 15)
     chart_2_df = get_last_n_days_df(site_df, selected_metrics, 2)
@@ -1038,11 +968,11 @@ def build_site_pdf_report_bytes(site_name, site_df, selected_metrics, scale_mode
 
     try:
         if fig_15 is not None:
-            fig_15.write_image(str(img_15_path), format="png", width=1600, height=900)
+            fig_15.write_image(str(img_15_path), format="png", width=1200, height=700)
             created_images.append(img_15_path)
 
         if fig_2 is not None:
-            fig_2.write_image(str(img_2_path), format="png", width=1600, height=900)
+            fig_2.write_image(str(img_2_path), format="png", width=1200, height=700)
             created_images.append(img_2_path)
 
         pdf = ReportPDF()
@@ -1050,43 +980,23 @@ def build_site_pdf_report_bytes(site_name, site_df, selected_metrics, scale_mode
 
         if img_15_path.exists():
             chart_bottom_y = add_chart_page(
-                pdf=pdf,
-                page_title=f"{site_name} - Last 15 Days",
-                image_path=img_15_path,
-                source_file_name=source_file_name,
-                selected_metrics=selected_metrics,
-                scale_mode=scale_mode
+                pdf, f"{site_name} - Last 15 Days", img_15_path,
+                source_file_name, selected_metrics, scale_mode
             )
             pdf.set_y(chart_bottom_y + 6)
             add_installation_insight_block(pdf, chart_15_df)
         else:
-            add_no_data_page(
-                pdf=pdf,
-                page_title=f"{site_name} - Last 15 Days",
-                source_file_name=source_file_name,
-                selected_metrics=selected_metrics,
-                scale_mode=scale_mode
-            )
+            add_no_data_page(pdf, f"{site_name} - Last 15 Days", source_file_name, selected_metrics, scale_mode)
 
         if img_2_path.exists():
             chart_bottom_y = add_chart_page(
-                pdf=pdf,
-                page_title=f"{site_name} - Last 2 Days",
-                image_path=img_2_path,
-                source_file_name=source_file_name,
-                selected_metrics=selected_metrics,
-                scale_mode=scale_mode
+                pdf, f"{site_name} - Last 2 Days", img_2_path,
+                source_file_name, selected_metrics, scale_mode
             )
             pdf.set_y(chart_bottom_y + 6)
             add_installation_insight_block(pdf, chart_2_df)
         else:
-            add_no_data_page(
-                pdf=pdf,
-                page_title=f"{site_name} - Last 2 Days",
-                source_file_name=source_file_name,
-                selected_metrics=selected_metrics,
-                scale_mode=scale_mode
-            )
+            add_no_data_page(pdf, f"{site_name} - Last 2 Days", source_file_name, selected_metrics, scale_mode)
 
         result = pdf.output(dest="S")
         return result if isinstance(result, (bytes, bytearray)) else result.encode("latin1")
@@ -1113,15 +1023,16 @@ def build_optimized_excel_report(
     if filtered_long.empty:
         return output.getvalue()
 
-    report_timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    report_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     temp_dir = REPORT_DIR / "temp_excel_images"
     temp_dir.mkdir(parents=True, exist_ok=True)
 
     working_df = filtered_long.copy()
-    working_df["date"] = pd.to_datetime(working_df["begin"]).dt.date
-    working_df["hour"] = pd.to_datetime(working_df["begin"]).dt.hour
-    working_df["month"] = pd.to_datetime(working_df["begin"]).dt.to_period("M").astype(str)
-    working_df["weekday"] = pd.to_datetime(working_df["begin"]).dt.day_name()
+    begin_dt = pd.to_datetime(working_df["begin"], errors="coerce")
+    working_df["date"] = begin_dt.dt.date
+    working_df["hour"] = begin_dt.dt.hour
+    working_df["month"] = begin_dt.dt.to_period("M").astype(str)
+    working_df["weekday"] = begin_dt.dt.day_name()
     working_df["timewindow"] = pd.cut(
         working_df["hour"],
         bins=[-1, 5, 11, 17, 23],
@@ -1145,37 +1056,21 @@ def build_optimized_excel_report(
         summary_df[col] = summary_df[col].round(2)
 
     pivot_site_avg = (
-        working_df.pivot_table(
-            index="site",
-            columns="metric",
-            values="value",
-            aggfunc="mean"
-        )
+        working_df.pivot_table(index="site", columns="metric", values="value", aggfunc="mean")
         .round(2)
         .reset_index()
     )
 
     pivot_date_avg = (
-        working_df.pivot_table(
-            index="date",
-            columns="metric",
-            values="value",
-            aggfunc="mean"
-        )
+        working_df.pivot_table(index="date", columns="metric", values="value", aggfunc="mean")
         .round(2)
         .reset_index()
     )
 
     dashboard_info = pd.DataFrame({
         "Field": [
-            "Source File",
-            "Generated On",
-            "Scale Mode",
-            "Selected Metrics",
-            "Sites",
-            "Records",
-            "Start Time",
-            "End Time"
+            "Source File", "Generated On", "Scale Mode", "Selected Metrics",
+            "Sites", "Records", "Start Time", "End Time"
         ],
         "Value": [
             source_file_name,
@@ -1196,7 +1091,7 @@ def build_optimized_excel_report(
     sites_for_charts = displayed_sites if displayed_sites else sorted(working_df["site"].dropna().unique().tolist())
 
     for site in sites_for_charts[:4]:
-        site_df = working_df[working_df["site"] == site].copy()
+        site_df = working_df.loc[working_df["site"] == site]
         if site_df.empty:
             continue
 
@@ -1238,7 +1133,7 @@ def build_optimized_excel_report(
             continue
 
         img_path = temp_dir / f"{safe_file_name(site)}_{report_timestamp}.png"
-        fig.write_image(str(img_path), format="png", width=1600, height=900)
+        fig.write_image(str(img_path), format="png", width=1200, height=700)
         chart_files.append(img_path)
         chart_data_blocks.append((site, img_path))
 
@@ -1273,7 +1168,8 @@ def build_optimized_excel_report(
         for col in ws.columns:
             max_len = 0
             col_letter = get_column_letter(col[0].column)
-            for cell in col[:300]:
+            sample_cells = list(col[:200])
+            for cell in sample_cells:
                 try:
                     if cell.value is not None:
                         max_len = max(max_len, len(str(cell.value)))
@@ -1282,8 +1178,7 @@ def build_optimized_excel_report(
             ws.column_dimensions[col_letter].width = min(max_len + 3, 28)
 
     for sheet_name in ["CleanData", "Summary", "PivotSiteAvg", "PivotDateAvg"]:
-        ws = wb[sheet_name]
-        style_sheet(ws)
+        style_sheet(wb[sheet_name])
 
     for sheet_name in ["PivotSiteAvg", "PivotDateAvg"]:
         ws = wb[sheet_name]
@@ -1314,14 +1209,13 @@ def build_optimized_excel_report(
     dashboard_ws.column_dimensions["A"].width = 24
     dashboard_ws.column_dimensions["B"].width = 40
 
-    for idx, (site, img_path) in enumerate(chart_data_blocks):
+    for idx, (_, img_path) in enumerate(chart_data_blocks):
         if idx >= len(chart_positions):
             break
-        anchor = chart_positions[idx]
         img = XLImage(str(img_path))
         img.width = 520
         img.height = 290
-        dashboard_ws.add_image(img, anchor)
+        dashboard_ws.add_image(img, chart_positions[idx])
 
     final_output = BytesIO()
     wb.save(final_output)
@@ -1340,45 +1234,6 @@ def build_optimized_excel_report(
 # =========================================================
 # MASTER TEMPLATE HELPERS
 # =========================================================
-def find_master_template(possible_names=None):
-    if possible_names is None:
-        possible_names = [
-            MASTER_TEMPLATE_NAME,
-            "MASTER file.xlsx",
-            "MASTER_FILE.xlsx",
-            "MASTER.xlsx"
-        ]
-
-    search_roots = [BASE_DIR, Path.cwd(), Path("/mnt/data")]
-    search_roots = [p for p in search_roots if p.exists()]
-
-    for root in search_roots:
-        for name in possible_names:
-            candidate = root / name
-            if candidate.exists():
-                return candidate
-
-    for root in search_roots:
-        for f in root.rglob("*.xlsx"):
-            if "master" in f.name.lower():
-                return f
-
-    raise FileNotFoundError(
-        f"Master workbook not found. Expected something like '{MASTER_TEMPLATE_NAME}'."
-    )
-
-
-def normalize_header_name(x):
-    return str(x).strip().lower().replace("\n", " ").replace("_", " ")
-
-
-def get_sheet_case_insensitive(wb, target_name):
-    for ws in wb.worksheets:
-        if ws.title.strip().lower() == target_name.strip().lower():
-            return ws
-    raise KeyError(f"Sheet '{target_name}' not found. Available sheets: {wb.sheetnames}")
-
-
 def build_refined_output_df(long_df):
     df = long_df.copy()
 
@@ -1400,8 +1255,8 @@ def build_refined_output_df(long_df):
             bins=[-1, 5, 11, 17, 23],
             labels=["Night", "Morning", "Afternoon", "Evening"]
         )
-        out["Date"] = pd.to_datetime(df["begin"], errors="coerce").dt.date
-        out["Time"] = pd.to_datetime(df["begin"], errors="coerce").dt.time
+        out["Date"] = df["begin"].dt.date
+        out["Time"] = df["begin"].dt.time
 
     if "end" in df.columns:
         out["end"] = df["end"]
@@ -1431,118 +1286,6 @@ def build_refined_output_df(long_df):
     return out
 
 
-def map_to_master_headers(refined_df, master_headers):
-    src_cols = list(refined_df.columns)
-    src_lookup = {normalize_header_name(c): c for c in src_cols}
-
-    output_df = pd.DataFrame(index=refined_df.index)
-
-    alias_candidates = {
-        "begin": ["begin", "start", "timestamp", "datetime"],
-        "end": ["end", "stop", "end time"],
-        "site": ["site", "location", "station"],
-        "metric": ["metric", "parameter type", "measure"],
-        "unit": ["unit", "uom"],
-        "parameter": ["parameter", "column", "tag"],
-        "value": ["value", "reading", "measured value"],
-        "date": ["date"],
-        "time": ["time"],
-        "hour": ["hour"],
-        "month": ["month"],
-        "weekday": ["weekday", "day"],
-        "timewindow": ["timewindow", "time window", "timeslot", "shift"]
-    }
-
-    for master_col in master_headers:
-        norm_master = normalize_header_name(master_col)
-
-        if norm_master in src_lookup:
-            output_df[master_col] = refined_df[src_lookup[norm_master]]
-            continue
-
-        matched = False
-        for _, aliases in alias_candidates.items():
-            if norm_master in aliases:
-                for alias in aliases:
-                    if alias in src_lookup:
-                        output_df[master_col] = refined_df[src_lookup[alias]]
-                        matched = True
-                        break
-            if matched:
-                break
-
-        if not matched:
-            output_df[master_col] = None
-
-    return output_df
-
-
-def clear_sheet_data_keep_header(ws):
-    if ws.max_row > 1:
-        ws.delete_rows(2, ws.max_row - 1)
-
-
-def copy_row_style(ws, source_row=2, target_row=2, max_col=None):
-    if max_col is None:
-        max_col = ws.max_column
-
-    for col in range(1, max_col + 1):
-        source_cell = ws.cell(row=source_row, column=col)
-        target_cell = ws.cell(row=target_row, column=col)
-
-        if source_cell.has_style:
-            target_cell._style = copy(source_cell._style)
-
-        target_cell.number_format = copy(source_cell.number_format)
-        target_cell.font = copy(source_cell.font)
-        target_cell.fill = copy(source_cell.fill)
-        target_cell.border = copy(source_cell.border)
-        target_cell.alignment = copy(source_cell.alignment)
-        target_cell.protection = copy(source_cell.protection)
-
-
-def write_dataframe_to_master_sheet(ws, final_df):
-    max_col = len(final_df.columns)
-    has_template_style_row = ws.max_row >= 2
-
-    for r_idx, row in enumerate(final_df.itertuples(index=False), start=2):
-        if has_template_style_row and r_idx > 2:
-            copy_row_style(ws, source_row=2, target_row=r_idx, max_col=max_col)
-
-        for c_idx, value in enumerate(row, start=1):
-            cell = ws.cell(row=r_idx, column=c_idx)
-
-            if pd.isna(value):
-                cell.value = None
-            elif isinstance(value, pd.Timestamp):
-                cell.value = value.to_pydatetime()
-            else:
-                cell.value = value
-
-
-
-
-
-def refresh_excel_tables(ws):
-    if not ws.tables:
-        return
-    table_names = list(ws.tables.keys())
-    for table_name in table_names:
-        if table_name == "TblCleanData":
-            continue
-        tab = ws.tables[table_name]
-        tab.ref = f"A1:{get_column_letter(ws.max_column)}{max(ws.max_row, 1)}"
-
-
-def set_workbook_calc_flags(wb):
-    try:
-        wb.calculation.fullCalcOnLoad = True
-        wb.calculation.forceFullCalc = True
-        wb.calculation.calcMode = "auto"
-    except Exception:
-        pass
-
-
 def build_master_template_report(filtered_long, source_file_name):
     if filtered_long.empty:
         return b"", pd.DataFrame(), "MASTER-file_Populated.xlsx", []
@@ -1553,15 +1296,12 @@ def build_master_template_report(filtered_long, source_file_name):
     if not master_template_path.exists():
         raise FileNotFoundError(f"Master template not found: {master_template_path}")
 
-    wb = load_workbook(master_template_path)
-    target_sheet_name = "Clean Data"
+    wb = load_workbook(master_template_path, data_only=False)
+    if MASTER_SHEET_NAME not in wb.sheetnames:
+        raise ValueError(f"Sheet '{MASTER_SHEET_NAME}' not found in {MASTER_TEMPLATE_NAME}")
 
-    if target_sheet_name not in wb.sheetnames:
-        raise ValueError(f"Sheet '{target_sheet_name}' not found in {MASTER_TEMPLATE_NAME}")
+    ws = wb[MASTER_SHEET_NAME]
 
-    ws = wb[target_sheet_name]
-
-    # Read existing headers from row 1
     existing_headers = []
     col_idx = 1
     while True:
@@ -1576,34 +1316,41 @@ def build_master_template_report(filtered_long, source_file_name):
         for i, col_name in enumerate(existing_headers, start=1):
             ws.cell(row=1, column=i, value=col_name)
 
-    # Clear all old data below header row
+    export_df = refined_df.copy()
+    for header in existing_headers:
+        if header not in export_df.columns:
+            export_df[header] = None
+    export_df = export_df[existing_headers]
+
     max_row = ws.max_row
     max_col = max(ws.max_column, len(existing_headers))
+
     if max_row > 1:
         for row in ws.iter_rows(min_row=2, max_row=max_row, min_col=1, max_col=max_col):
             for cell in row:
                 cell.value = None
 
-    # Match dataframe to master sheet headers
-    export_df = refined_df.copy()
-    for header in existing_headers:
-        if header not in export_df.columns:
-            export_df[header] = None
-
-    export_df = export_df[existing_headers]
-
-    # Write data starting from row 2
-    for r_idx, row in enumerate(export_df.itertuples(index=False, name=None), start=2):
+    rows_to_write = export_df.itertuples(index=False, name=None)
+    for r_idx, row in enumerate(rows_to_write, start=2):
         for c_idx, value in enumerate(row, start=1):
-            ws.cell(row=r_idx, column=c_idx, value=value)
+            if pd.isna(value):
+                ws.cell(row=r_idx, column=c_idx, value=None)
+            elif isinstance(value, pd.Timestamp):
+                ws.cell(row=r_idx, column=c_idx, value=value.to_pydatetime())
+            else:
+                ws.cell(row=r_idx, column=c_idx, value=value)
 
     output = BytesIO()
     wb.save(output)
     output.seek(0)
 
-    return output.getvalue(), export_df, "MASTER-file_Populated.xlsx", existing_headers
+    preview_df = export_df.head(200)
+    return output.getvalue(), preview_df, "MASTER-file_Populated.xlsx", existing_headers
 
 
+# =========================================================
+# SESSION HELPERS
+# =========================================================
 def init_dashboard_state(current_hash, sites, metrics):
     default_metrics = [m for m in ["Wind Speed", "Wind Direction"] if m in metrics]
     if not default_metrics and metrics:
@@ -1614,17 +1361,18 @@ def init_dashboard_state(current_hash, sites, metrics):
         st.session_state["applied_filters"] = {
             "scale_mode": "Normalized (0-100)",
             "selected_metrics": default_metrics,
-            "displayed_sites": sites,
-            "report_sites": sites
+            "displayed_sites": sites[:6],
+            "report_sites": sites[:6]
         }
         st.session_state["site_view_state"] = {}
         st.session_state["generated_site_pdfs"] = []
+        st.session_state["last_saved_hash"] = None
 
     st.session_state.setdefault("applied_filters", {
         "scale_mode": "Normalized (0-100)",
         "selected_metrics": default_metrics,
-        "displayed_sites": sites,
-        "report_sites": sites
+        "displayed_sites": sites[:6],
+        "report_sites": sites[:6]
     })
     st.session_state.setdefault("site_view_state", {})
     st.session_state.setdefault("generated_site_pdfs", [])
@@ -1641,6 +1389,10 @@ def ensure_site_state(site, site_min, site_max):
         }
 
 
+def build_site_lookup(df):
+    return {site: sdf for site, sdf in df.groupby("site", sort=True)}
+
+
 # =========================================================
 # UI
 # =========================================================
@@ -1650,7 +1402,7 @@ st.markdown("""
         <div class="hero-title">Meteorological Operations Suite</div>
         <div class="hero-subtitle">
             Compact operational monitoring dashboard for multi-site meteorological data.
-            Focused on clean charting, fast filtering, and minimal on-screen clutter.
+            Focused on clean charting, faster filtering, and lower runtime load.
         </div>
         <span class="pill">Compact UI</span>
         <span class="pill">Instant 15/2 Days</span>
@@ -1672,11 +1424,7 @@ if uploaded_file is None:
     if show_upload_history:
         log_df = load_upload_log()
         if not log_df.empty:
-            st.dataframe(
-                log_df.sort_values("upload_timestamp", ascending=False).head(10),
-                use_container_width=True,
-                hide_index=True
-            )
+            st.dataframe(log_df.sort_values("upload_timestamp", ascending=False).head(10), use_container_width=True, hide_index=True)
     st.stop()
 
 try:
@@ -1696,6 +1444,7 @@ if st.session_state.get("last_saved_hash") != current_hash:
 
 sites = sorted(long_df["site"].dropna().unique().tolist())
 metrics = sorted(long_df["metric"].dropna().unique().tolist())
+site_lookup = build_site_lookup(long_df)
 
 init_dashboard_state(current_hash, sites, metrics)
 applied = st.session_state["applied_filters"]
@@ -1723,7 +1472,6 @@ with st.sidebar.form("dashboard_filter_form"):
         options=sites,
         default=[s for s in applied["report_sites"] if s in sites]
     )
-
     view_dashboard = st.form_submit_button("View Dashboard", use_container_width=True)
 
 if view_dashboard:
@@ -1740,16 +1488,16 @@ selected_metrics = applied["selected_metrics"]
 displayed_sites = applied["displayed_sites"]
 selected_sites_for_reports = applied["report_sites"]
 
-filtered_long = long_df[
+filtered_long = long_df.loc[
     long_df["site"].isin(selected_sites_for_reports) &
     long_df["metric"].isin(selected_metrics)
-].copy()
+]
 
 summary_tables = {}
 if show_summary_tables and selected_metrics:
     st.markdown('<div class="section-label">Metric Summaries</div>', unsafe_allow_html=True)
     for metric in selected_metrics:
-        metric_df = filtered_long[filtered_long["metric"] == metric].copy()
+        metric_df = filtered_long.loc[filtered_long["metric"] == metric]
         if metric_df.empty:
             continue
 
@@ -1769,6 +1517,7 @@ st.markdown("""
 Apply filters from the sidebar, then use <b>View Dashboard</b>.
 Each site card supports 15 Day, 2 Day, and Custom views.
 The PDF generator creates one PDF per selected report site and includes exactly two charts per PDF: 15 Day and 2 Day.
+The master template export simply fills data under the headers in sheet <b>Clean Data</b>.
 </div>
 """, unsafe_allow_html=True)
 
@@ -1778,8 +1527,8 @@ if not selected_metrics:
     st.warning("Please select at least one parameter and click View Dashboard.")
 else:
     for site in displayed_sites:
-        site_df = long_df[long_df["site"] == site].copy()
-        if site_df.empty:
+        site_df = site_lookup.get(site)
+        if site_df is None or site_df.empty:
             continue
 
         site_min = site_df["begin"].min()
@@ -1789,7 +1538,7 @@ else:
         site_state = st.session_state["site_view_state"][site]
         safe_site = safe_file_name(site)
 
-        metrics_present = sorted(site_df[site_df["metric"].isin(selected_metrics)]["metric"].dropna().unique().tolist())
+        metrics_present = sorted(site_df.loc[site_df["metric"].isin(selected_metrics), "metric"].dropna().unique().tolist())
         chips_html = "".join([f'<span class="metric-chip">{m}</span>' for m in metrics_present])
 
         st.markdown('<div class="site-shell">', unsafe_allow_html=True)
@@ -1807,8 +1556,7 @@ else:
         current_mode = st.radio(
             "View range",
             options=["15 Day", "2 Day", "Custom"],
-            index=["15 Day", "2 Day", "Custom"].index(site_state["mode"])
-            if site_state["mode"] in ["15 Day", "2 Day", "Custom"] else 0,
+            index=["15 Day", "2 Day", "Custom"].index(site_state["mode"]) if site_state["mode"] in ["15 Day", "2 Day", "Custom"] else 0,
             horizontal=True,
             key=f"{safe_site}_mode_radio",
             label_visibility="collapsed"
@@ -1821,10 +1569,7 @@ else:
         )
 
         if current_mode == "Custom":
-            st.markdown(
-                '<div class="helper-note">Choose dates and time, then click <b>View Custom Range</b>.</div>',
-                unsafe_allow_html=True
-            )
+            st.markdown('<div class="helper-note">Choose dates and time, then click <b>View Custom Range</b>.</div>', unsafe_allow_html=True)
 
             with st.form(f"custom_form_{safe_site}"):
                 c1, c2, c3, c4 = st.columns(4)
@@ -1894,11 +1639,7 @@ else:
         )
 
         if fig is not None:
-            st.plotly_chart(
-                fig,
-                use_container_width=True,
-                config={"displaylogo": False, "responsive": True}
-            )
+            st.plotly_chart(fig, use_container_width=True, config={"displaylogo": False, "responsive": True})
         else:
             st.info("No data available for the current site view.")
 
@@ -1929,15 +1670,15 @@ if st.button("Generate Site PDF Reports"):
         st.warning("Please select at least one report site before generating PDFs.")
     else:
         generated_reports = []
-        report_timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        report_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
         with st.spinner("Generating site PDF reports..."):
             for site in selected_sites_for_reports:
-                site_df = long_df[
-                    (long_df["site"] == site) &
-                    (long_df["metric"].isin(selected_metrics))
-                ].copy()
+                site_df = site_lookup.get(site)
+                if site_df is None or site_df.empty:
+                    continue
 
+                site_df = site_df.loc[site_df["metric"].isin(selected_metrics)]
                 if site_df.empty:
                     continue
 
@@ -1990,7 +1731,7 @@ if st.button("Generate Optimized Excel"):
                 displayed_sites=displayed_sites
             )
 
-        excel_name = f"Optimized_Meteo_Report_{datetime.now().strftime('%Y%m%d%H%M%S')}.xlsx"
+        excel_name = f"Optimized_Meteo_Report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
         st.download_button(
             label="Download Optimized Excel",
             data=excel_bytes,
@@ -2018,7 +1759,7 @@ if st.button("Generate Master Template Excel"):
                 st.write(master_headers)
                 st.dataframe(master_preview_df, use_container_width=True, hide_index=True)
 
-            master_output_name = f"Updated_MASTER_{datetime.now().strftime('%Y%m%d%H%M%S')}.xlsx"
+            master_output_name = f"Updated_MASTER_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
             st.download_button(
                 label="Download Updated Master Workbook",
                 data=master_bytes,
@@ -2056,11 +1797,9 @@ if generated_site_pdfs:
                 use_container_width=True
             )
 
-    
-
 if show_raw:
     st.markdown('<div class="section-label">Processed Raw Data</div>', unsafe_allow_html=True)
-    st.dataframe(filtered_long, use_container_width=True, hide_index=True)
+    st.dataframe(filtered_long.head(5000), use_container_width=True, hide_index=True)
 
 if show_upload_history:
     log_df = load_upload_log()
