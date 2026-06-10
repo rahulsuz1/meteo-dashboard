@@ -11,7 +11,6 @@ from datetime import datetime, time
 from fpdf import FPDF
 import smtplib
 from email.message import EmailMessage
-from copy import copy
 from openpyxl import load_workbook
 from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 from openpyxl.formatting.rule import ColorScaleRule
@@ -319,6 +318,27 @@ COLOR_MAP = {
 # =========================================================
 # HELPERS
 # =========================================================
+def apply_clean_data_table(ws):
+    if ws.max_row < 2 or ws.max_column < 1:
+        return
+
+    existing_table_names = list(ws.tables.keys())
+    for table_name in existing_table_names:
+        if table_name == "TblCleanData":
+            del ws.tables[table_name]
+
+    table_ref = f"A1:{get_column_letter(ws.max_column)}{ws.max_row}"
+    tab = Table(displayName="TblCleanData", ref=table_ref)
+    tab.tableStyleInfo = TableStyleInfo(
+        name="TableStyleMedium2",
+        showFirstColumn=False,
+        showLastColumn=False,
+        showRowStripes=True,
+        showColumnStripes=False
+    )
+    ws.add_table(tab)
+
+
 def send_reports_email_gmail(to_emails, subject, body, reports):
     sender = st.secrets["EMAIL_SENDER"]
     password = st.secrets["EMAIL_PASSWORD"]
@@ -1370,45 +1390,6 @@ def build_optimized_excel_report(
 # =========================================================
 # MASTER TEMPLATE HELPERS
 # =========================================================
-def find_master_template(possible_names=None):
-    if possible_names is None:
-        possible_names = [
-            MASTER_TEMPLATE_NAME,
-            "MASTER file.xlsx",
-            "MASTER_FILE.xlsx",
-            "MASTER.xlsx"
-        ]
-
-    search_roots = [BASE_DIR, Path.cwd(), Path("/mnt/data")]
-    search_roots = [p for p in search_roots if p.exists()]
-
-    for root in search_roots:
-        for name in possible_names:
-            candidate = root / name
-            if candidate.exists():
-                return candidate
-
-    for root in search_roots:
-        for f in root.rglob("*.xlsx"):
-            if "master" in f.name.lower():
-                return f
-
-    raise FileNotFoundError(
-        f"Master workbook not found. Expected something like '{MASTER_TEMPLATE_NAME}'."
-    )
-
-
-def normalize_header_name(x):
-    return str(x).strip().lower().replace("\n", " ").replace("_", " ")
-
-
-def get_sheet_case_insensitive(wb, target_name):
-    for ws in wb.worksheets:
-        if ws.title.strip().lower() == target_name.strip().lower():
-            return ws
-    raise KeyError(f"Sheet '{target_name}' not found. Available sheets: {wb.sheetnames}")
-
-
 def build_refined_output_df(long_df):
     df = long_df.copy()
 
@@ -1461,161 +1442,31 @@ def build_refined_output_df(long_df):
     return out
 
 
-def map_to_master_headers(refined_df, master_headers):
-    src_cols = list(refined_df.columns)
-    src_lookup = {normalize_header_name(c): c for c in src_cols}
-
-    output_df = pd.DataFrame(index=refined_df.index)
-
-    alias_candidates = {
-        "begin": ["begin", "start", "timestamp", "datetime"],
-        "end": ["end", "stop", "end time"],
-        "site": ["site", "location", "station"],
-        "metric": ["metric", "parameter type", "measure"],
-        "unit": ["unit", "uom"],
-        "parameter": ["parameter", "column", "tag"],
-        "value": ["value", "reading", "measured value"],
-        "date": ["date"],
-        "time": ["time"],
-        "hour": ["hour"],
-        "month": ["month"],
-        "weekday": ["weekday", "day"],
-        "timewindow": ["timewindow", "time window", "timeslot", "shift"]
-    }
-
-    for master_col in master_headers:
-        norm_master = normalize_header_name(master_col)
-
-        if norm_master in src_lookup:
-            output_df[master_col] = refined_df[src_lookup[norm_master]]
-            continue
-
-        matched = False
-        for _, aliases in alias_candidates.items():
-            if norm_master in aliases:
-                for alias in aliases:
-                    if alias in src_lookup:
-                        output_df[master_col] = refined_df[src_lookup[alias]]
-                        matched = True
-                        break
-            if matched:
-                break
-
-        if not matched:
-            output_df[master_col] = None
-
-    return output_df
-
-
-def clear_sheet_data_keep_header(ws):
-    if ws.max_row > 1:
-        ws.delete_rows(2, ws.max_row - 1)
-
-
-def copy_row_style(ws, source_row=2, target_row=2, max_col=None):
-    if max_col is None:
-        max_col = ws.max_column
-
-    for col in range(1, max_col + 1):
-        source_cell = ws.cell(row=source_row, column=col)
-        target_cell = ws.cell(row=target_row, column=col)
-
-        if source_cell.has_style:
-            target_cell._style = copy(source_cell._style)
-
-        target_cell.number_format = copy(source_cell.number_format)
-        target_cell.font = copy(source_cell.font)
-        target_cell.fill = copy(source_cell.fill)
-        target_cell.border = copy(source_cell.border)
-        target_cell.alignment = copy(source_cell.alignment)
-        target_cell.protection = copy(source_cell.protection)
-
-
-def write_dataframe_to_master_sheet(ws, final_df):
-    max_col = len(final_df.columns)
-    has_template_style_row = ws.max_row >= 2
-
-    for r_idx, row in enumerate(final_df.itertuples(index=False), start=2):
-        if has_template_style_row and r_idx > 2:
-            copy_row_style(ws, source_row=2, target_row=r_idx, max_col=max_col)
-
-        for c_idx, value in enumerate(row, start=1):
-            cell = ws.cell(row=r_idx, column=c_idx)
-
-            if pd.isna(value):
-                cell.value = None
-            elif isinstance(value, pd.Timestamp):
-                cell.value = value.to_pydatetime()
-            else:
-                cell.value = value
-
-
-def apply_clean_data_table(ws):
-    if ws.max_row < 2 or ws.max_column < 1:
-        return
-
-    if "TblCleanData" in ws.tables:
-        del ws.tables["TblCleanData"]
-
-    table_ref = f"A1:{get_column_letter(ws.max_column)}{max(ws.max_row, 2)}"
-    tab = Table(displayName="TblCleanData", ref=table_ref)
-    tab.tableStyleInfo = TableStyleInfo(
-        name="TableStyleMedium2",
-        showFirstColumn=False,
-        showLastColumn=False,
-        showRowStripes=True,
-        showColumnStripes=False
-    )
-    ws.add_table(tab)
-
-
-def refresh_excel_tables(ws):
-    if not ws.tables:
-        return
-    table_names = list(ws.tables.keys())
-    for table_name in table_names:
-        if table_name == "TblCleanData":
-            continue
-        tab = ws.tables[table_name]
-        tab.ref = f"A1:{get_column_letter(ws.max_column)}{max(ws.max_row, 1)}"
-
-
-def set_workbook_calc_flags(wb):
-    try:
-        wb.calculation.fullCalcOnLoad = True
-        wb.calculation.forceFullCalc = True
-        wb.calculation.calcMode = "auto"
-    except Exception:
-        pass
-
-
 def build_master_template_report(filtered_long, source_file_name):
     if filtered_long.empty:
-        return b"", pd.DataFrame(), "", []
+        return b"", pd.DataFrame(), "CleanData_Processed.xlsx", []
 
     refined_df = build_refined_output_df(filtered_long)
 
-    master_path = find_master_template()
-    wb = load_workbook(master_path)
-    ws = get_sheet_case_insensitive(wb, MASTER_SHEET_NAME)
-
-    master_headers = [cell.value for cell in ws[1] if cell.value is not None]
-    if not master_headers:
-        raise ValueError(f"No headers found in row 1 of sheet '{ws.title}'.")
-
-    final_df = map_to_master_headers(refined_df, master_headers)
-
-    clear_sheet_data_keep_header(ws)
-    write_dataframe_to_master_sheet(ws, final_df)
-    apply_clean_data_table(ws)
-    refresh_excel_tables(ws)
-    set_workbook_calc_flags(wb)
-
     output = BytesIO()
-    wb.save(output)
-    output.seek(0)
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        refined_df.to_excel(writer, sheet_name="Clean Data", index=False)
 
-    return output.getvalue(), final_df, master_path.name, master_headers
+        ws = writer.book["Clean Data"]
+        if ws.max_row >= 2 and ws.max_column >= 1:
+            table_ref = f"A1:{get_column_letter(ws.max_column)}{ws.max_row}"
+            tab = Table(displayName="TblCleanData", ref=table_ref)
+            tab.tableStyleInfo = TableStyleInfo(
+                name="TableStyleMedium2",
+                showFirstColumn=False,
+                showLastColumn=False,
+                showRowStripes=True,
+                showColumnStripes=False
+            )
+            ws.add_table(tab)
+
+    output.seek(0)
+    return output.getvalue(), refined_df, "CleanData_Processed.xlsx", list(refined_df.columns)
 
 
 def init_dashboard_state(current_hash, sites, metrics):
@@ -1670,7 +1521,7 @@ st.markdown("""
         <span class="pill">Instant 15/2 Days</span>
         <span class="pill">Custom Range View</span>
         <span class="pill">Per-Site PDF Reports</span>
-        <span class="pill">Master Template Export</span>
+        <span class="pill">Clean Data Export for Master Dashboard</span>
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -1783,6 +1634,7 @@ st.markdown("""
 Apply filters from the sidebar, then use <b>View Dashboard</b>.
 Each site card supports 15 Day, 2 Day, and Custom views.
 The PDF generator creates one PDF per selected report site and includes exactly two charts per PDF: 15 Day and 2 Day.
+The master dashboard workbook itself is not rewritten here, so slicers remain safe in your original file.
 </div>
 """, unsafe_allow_html=True)
 
@@ -2013,28 +1865,30 @@ if st.button("Generate Optimized Excel"):
             use_container_width=True
         )
 
-st.markdown("### Generate Master Template Excel")
+st.markdown("### Export Clean Data for Master Dashboard")
 
-if st.button("Generate Master Template Excel"):
+if st.button("Generate Clean Data Excel for Master Dashboard"):
     if filtered_long.empty:
-        st.warning("No filtered data available to export into the master template.")
+        st.warning("No filtered data available to export.")
     else:
         try:
-            with st.spinner("Populating master template workbook..."):
+            with st.spinner("Generating clean data workbook..."):
                 master_bytes, master_preview_df, master_filename, master_headers = build_master_template_report(
                     filtered_long=filtered_long,
                     source_file_name=uploaded_file.name
                 )
 
-            st.success(f"Master workbook '{master_filename}' populated successfully into sheet '{MASTER_SHEET_NAME}'.")
+            st.success(
+                "Clean data workbook generated successfully. Use this as the source for your untouched master dashboard workbook."
+            )
 
-            with st.expander("Preview mapped master data", expanded=False):
+            with st.expander("Preview exported clean data", expanded=False):
                 st.write(master_headers)
                 st.dataframe(master_preview_df, use_container_width=True, hide_index=True)
 
-            master_output_name = f"Updated_MASTER_{datetime.now().strftime('%Y%m%d%H%M%S')}.xlsx"
+            master_output_name = f"CleanData_Processed_{datetime.now().strftime('%Y%m%d%H%M%S')}.xlsx"
             st.download_button(
-                label="Download Updated Master Workbook",
+                label="Download Clean Data Excel",
                 data=master_bytes,
                 file_name=master_output_name,
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -2042,7 +1896,7 @@ if st.button("Generate Master Template Excel"):
             )
 
         except Exception as e:
-            st.error(f"Master template export failed: {e}")
+            st.error(f"Clean data export failed: {e}")
 
 generated_site_pdfs = st.session_state.get("generated_site_pdfs", [])
 
