@@ -319,36 +319,6 @@ COLOR_MAP = {
 # =========================================================
 # HELPERS
 # =========================================================
-def send_reports_email_gmail(to_emails, subject, body, reports):
-    sender = st.secrets["EMAIL_SENDER"]
-    password = st.secrets["EMAIL_PASSWORD"]
-
-    msg = EmailMessage()
-    msg["Subject"] = subject
-    msg["From"] = sender
-    msg["To"] = ", ".join(to_emails)
-    msg.set_content(body)
-
-    for report in reports:
-        pdf_path = report["path"]
-        file_name = report["file_name"]
-
-        with open(pdf_path, "rb") as f:
-            pdf_data = f.read()
-
-        msg.add_attachment(
-            pdf_data,
-            maintype="application",
-            subtype="pdf",
-            filename=file_name
-        )
-
-    with smtplib.SMTP("smtp.gmail.com", 587) as server:
-        server.ehlo()
-        server.starttls()
-        server.ehlo()
-        server.login(sender, password)
-        server.send_message(msg)
 
 
 def safe_file_name(name: str) -> str:
@@ -2086,32 +2056,7 @@ if generated_site_pdfs:
                 use_container_width=True
             )
 
-    st.markdown("### Email Reports")
-    email_recipients_input = st.text_area("Recipient emails comma separated", value="")
-    email_subject = st.text_input("Email subject", value="Meteorological Site Reports")
-    email_body = st.text_area(
-        "Email body",
-        value="Please find attached the generated meteorological site PDF reports."
-    )
-
-    if st.button("Send Email With All Reports"):
-        if not generated_site_pdfs:
-            st.warning("No generated reports available to email.")
-        else:
-            to_emails = [e.strip() for e in email_recipients_input.split(",") if e.strip()]
-            if not to_emails:
-                st.warning("Please enter at least one recipient email.")
-            else:
-                try:
-                    send_reports_email_gmail(
-                        to_emails=to_emails,
-                        subject=email_subject,
-                        body=email_body,
-                        reports=generated_site_pdfs
-                    )
-                    st.success("Email sent successfully with all attached reports.")
-                except Exception as e:
-                    st.error(f"Email failed: {e}")
+    
 
 if show_raw:
     st.markdown('<div class="section-label">Processed Raw Data</div>', unsafe_allow_html=True)
