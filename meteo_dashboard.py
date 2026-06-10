@@ -1550,23 +1550,7 @@ def write_dataframe_to_master_sheet(ws, final_df):
                 cell.value = value
 
 
-def apply_clean_data_table(ws):
-    if ws.max_row < 2 or ws.max_column < 1:
-        return
 
-    if "TblCleanData" in ws.tables:
-        del ws.tables["TblCleanData"]
-
-    table_ref = f"A1:{get_column_letter(ws.max_column)}{max(ws.max_row, 2)}"
-    tab = Table(displayName="TblCleanData", ref=table_ref)
-    tab.tableStyleInfo = TableStyleInfo(
-        name="TableStyleMedium2",
-        showFirstColumn=False,
-        showLastColumn=False,
-        showRowStripes=True,
-        showColumnStripes=False
-    )
-    ws.add_table(tab)
 
 
 def refresh_excel_tables(ws):
@@ -1591,31 +1575,63 @@ def set_workbook_calc_flags(wb):
 
 def build_master_template_report(filtered_long, source_file_name):
     if filtered_long.empty:
-        return b"", pd.DataFrame(), "", []
+        return b"", pd.DataFrame(), "MASTER-file_Populated.xlsx", []
 
     refined_df = build_refined_output_df(filtered_long)
 
-    master_path = find_master_template()
-    wb = load_workbook(master_path)
-    ws = get_sheet_case_insensitive(wb, MASTER_SHEET_NAME)
+    master_template_path = BASE_DIR / MASTER_TEMPLATE_NAME
+    if not master_template_path.exists():
+        raise FileNotFoundError(f"Master template not found: {master_template_path}")
 
-    master_headers = [cell.value for cell in ws[1] if cell.value is not None]
-    if not master_headers:
-        raise ValueError(f"No headers found in row 1 of sheet '{ws.title}'.")
+    wb = load_workbook(master_template_path)
+    target_sheet_name = "Clean Data"
 
-    final_df = map_to_master_headers(refined_df, master_headers)
+    if target_sheet_name not in wb.sheetnames:
+        raise ValueError(f"Sheet '{target_sheet_name}' not found in {MASTER_TEMPLATE_NAME}")
 
-    clear_sheet_data_keep_header(ws)
-    write_dataframe_to_master_sheet(ws, final_df)
-    apply_clean_data_table(ws)
-    refresh_excel_tables(ws)
-    set_workbook_calc_flags(wb)
+    ws = wb[target_sheet_name]
+
+    # Read existing headers from row 1
+    existing_headers = []
+    col_idx = 1
+    while True:
+        header_val = ws.cell(row=1, column=col_idx).value
+        if header_val is None or str(header_val).strip() == "":
+            break
+        existing_headers.append(str(header_val).strip())
+        col_idx += 1
+
+    if not existing_headers:
+        existing_headers = list(refined_df.columns)
+        for i, col_name in enumerate(existing_headers, start=1):
+            ws.cell(row=1, column=i, value=col_name)
+
+    # Clear all old data below header row
+    max_row = ws.max_row
+    max_col = max(ws.max_column, len(existing_headers))
+    if max_row > 1:
+        for row in ws.iter_rows(min_row=2, max_row=max_row, min_col=1, max_col=max_col):
+            for cell in row:
+                cell.value = None
+
+    # Match dataframe to master sheet headers
+    export_df = refined_df.copy()
+    for header in existing_headers:
+        if header not in export_df.columns:
+            export_df[header] = None
+
+    export_df = export_df[existing_headers]
+
+    # Write data starting from row 2
+    for r_idx, row in enumerate(export_df.itertuples(index=False, name=None), start=2):
+        for c_idx, value in enumerate(row, start=1):
+            ws.cell(row=r_idx, column=c_idx, value=value)
 
     output = BytesIO()
     wb.save(output)
     output.seek(0)
 
-    return output.getvalue(), final_df, master_path.name, master_headers
+    return output.getvalue(), export_df, "MASTER-file_Populated.xlsx", existing_headers
 
 
 def init_dashboard_state(current_hash, sites, metrics):
