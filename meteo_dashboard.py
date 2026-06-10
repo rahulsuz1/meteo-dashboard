@@ -11,6 +11,7 @@ from datetime import datetime, time
 from fpdf import FPDF
 import smtplib
 from email.message import EmailMessage
+from copy import copy
 from openpyxl import load_workbook
 from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 from openpyxl.formatting.rule import ColorScaleRule
@@ -295,6 +296,12 @@ for folder in [UPLOAD_DIR, PROCESSED_DIR, REPORT_DIR]:
     folder.mkdir(parents=True, exist_ok=True)
 
 # =========================================================
+# MASTER TEMPLATE CONFIG
+# =========================================================
+MASTER_TEMPLATE_NAME = "MASTER-file.xlsx"
+MASTER_SHEET_NAME = "clean data"
+
+# =========================================================
 # CONSTANTS
 # =========================================================
 METRIC_PATTERN = re.compile(
@@ -333,7 +340,7 @@ def send_reports_email_gmail(to_emails, subject, body, reports):
             pdf_data,
             maintype="application",
             subtype="pdf",
-            file_name=file_name
+            filename=file_name
         )
 
     with smtplib.SMTP("smtp.gmail.com", 587) as server:
@@ -903,16 +910,16 @@ def build_combined_chart(df, site_name, scale_mode, chart_id=None, title_suffix=
     fig.update_layout(
         title=full_title,
         template="plotly_white",
-        height=455,
-        margin=dict(l=10, r=10, t=35, b=60),
+        height=520,
+        margin=dict(l=10, r=10, t=35, b=110),
         legend=dict(
             orientation="h",
             yanchor="top",
-            y=-0.18,
+            y=-0.22,
             xanchor="center",
             x=0.5,
             bgcolor="rgba(255,255,255,0.0)",
-            font=dict(size=11)
+            font=dict(size=10)
         ),
         legend_title="",
         hovermode="x unified",
@@ -1011,7 +1018,12 @@ def add_chart_page(pdf, page_title, image_path, source_file_name, selected_metri
     pdf.cell(0, 5, f"Scale mode: {scale_mode}", ln=True)
     pdf.cell(0, 5, f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", ln=True)
     pdf.ln(3)
-    pdf.image(str(image_path), x=10, y=pdf.get_y(), w=190)
+
+    image_y = pdf.get_y()
+    image_w = 190
+    image_h = 107
+    pdf.image(str(image_path), x=10, y=image_y, w=image_w)
+    return image_y + image_h
 
 
 def add_no_data_page(pdf, page_title, source_file_name, selected_metrics, scale_mode):
@@ -1067,7 +1079,7 @@ def build_site_pdf_report_bytes(site_name, site_df, selected_metrics, scale_mode
         pdf.set_auto_page_break(auto=True, margin=10)
 
         if img_15_path.exists():
-            add_chart_page(
+            chart_bottom_y = add_chart_page(
                 pdf=pdf,
                 page_title=f"{site_name} - Last 15 Days",
                 image_path=img_15_path,
@@ -1075,7 +1087,7 @@ def build_site_pdf_report_bytes(site_name, site_df, selected_metrics, scale_mode
                 selected_metrics=selected_metrics,
                 scale_mode=scale_mode
             )
-            pdf.set_y(145)
+            pdf.set_y(chart_bottom_y + 6)
             add_installation_insight_block(pdf, chart_15_df)
         else:
             add_no_data_page(
@@ -1087,7 +1099,7 @@ def build_site_pdf_report_bytes(site_name, site_df, selected_metrics, scale_mode
             )
 
         if img_2_path.exists():
-            add_chart_page(
+            chart_bottom_y = add_chart_page(
                 pdf=pdf,
                 page_title=f"{site_name} - Last 2 Days",
                 image_path=img_2_path,
@@ -1095,7 +1107,7 @@ def build_site_pdf_report_bytes(site_name, site_df, selected_metrics, scale_mode
                 selected_metrics=selected_metrics,
                 scale_mode=scale_mode
             )
-            pdf.set_y(145)
+            pdf.set_y(chart_bottom_y + 6)
             add_installation_insight_block(pdf, chart_2_df)
         else:
             add_no_data_page(
@@ -1355,6 +1367,257 @@ def build_optimized_excel_report(
     return final_output.getvalue()
 
 
+# =========================================================
+# MASTER TEMPLATE HELPERS
+# =========================================================
+def find_master_template(possible_names=None):
+    if possible_names is None:
+        possible_names = [
+            MASTER_TEMPLATE_NAME,
+            "MASTER file.xlsx",
+            "MASTER_FILE.xlsx",
+            "MASTER.xlsx"
+        ]
+
+    search_roots = [BASE_DIR, Path.cwd(), Path("/mnt/data")]
+    search_roots = [p for p in search_roots if p.exists()]
+
+    for root in search_roots:
+        for name in possible_names:
+            candidate = root / name
+            if candidate.exists():
+                return candidate
+
+    for root in search_roots:
+        for f in root.rglob("*.xlsx"):
+            if "master" in f.name.lower():
+                return f
+
+    raise FileNotFoundError(
+        f"Master workbook not found. Expected something like '{MASTER_TEMPLATE_NAME}'."
+    )
+
+
+def normalize_header_name(x):
+    return str(x).strip().lower().replace("\n", " ").replace("_", " ")
+
+
+def get_sheet_case_insensitive(wb, target_name):
+    for ws in wb.worksheets:
+        if ws.title.strip().lower() == target_name.strip().lower():
+            return ws
+    raise KeyError(f"Sheet '{target_name}' not found. Available sheets: {wb.sheetnames}")
+
+
+def build_refined_output_df(long_df):
+    df = long_df.copy()
+
+    if "begin" in df.columns:
+        df["begin"] = pd.to_datetime(df["begin"], errors="coerce")
+    if "end" in df.columns:
+        df["end"] = pd.to_datetime(df["end"], errors="coerce")
+
+    out = pd.DataFrame()
+
+    if "begin" in df.columns:
+        out["begin"] = df["begin"]
+        out["Begin"] = df["begin"]
+        out["hour"] = df["begin"].dt.hour
+        out["month"] = df["begin"].dt.to_period("M").astype(str)
+        out["weekday"] = df["begin"].dt.day_name()
+        out["timewindow"] = pd.cut(
+            df["begin"].dt.hour,
+            bins=[-1, 5, 11, 17, 23],
+            labels=["Night", "Morning", "Afternoon", "Evening"]
+        )
+        out["Date"] = pd.to_datetime(df["begin"], errors="coerce").dt.date
+        out["Time"] = pd.to_datetime(df["begin"], errors="coerce").dt.time
+
+    if "end" in df.columns:
+        out["end"] = df["end"]
+        out["End"] = df["end"]
+
+    if "site" in df.columns:
+        out["site"] = df["site"]
+        out["Site"] = df["site"]
+
+    if "metric" in df.columns:
+        out["metric"] = df["metric"]
+        out["Metric"] = df["metric"]
+
+    if "unit" in df.columns:
+        out["unit"] = df["unit"]
+        out["Unit"] = df["unit"]
+
+    if "parameter" in df.columns:
+        out["parameter"] = df["parameter"]
+        out["Parameter"] = df["parameter"]
+
+    if "value" in df.columns:
+        out["value"] = pd.to_numeric(df["value"], errors="coerce")
+        out["Value"] = pd.to_numeric(df["value"], errors="coerce")
+
+    out = out.loc[:, ~out.columns.duplicated()]
+    return out
+
+
+def map_to_master_headers(refined_df, master_headers):
+    src_cols = list(refined_df.columns)
+    src_lookup = {normalize_header_name(c): c for c in src_cols}
+
+    output_df = pd.DataFrame(index=refined_df.index)
+
+    alias_candidates = {
+        "begin": ["begin", "start", "timestamp", "datetime"],
+        "end": ["end", "stop", "end time"],
+        "site": ["site", "location", "station"],
+        "metric": ["metric", "parameter type", "measure"],
+        "unit": ["unit", "uom"],
+        "parameter": ["parameter", "column", "tag"],
+        "value": ["value", "reading", "measured value"],
+        "date": ["date"],
+        "time": ["time"],
+        "hour": ["hour"],
+        "month": ["month"],
+        "weekday": ["weekday", "day"],
+        "timewindow": ["timewindow", "time window", "timeslot", "shift"]
+    }
+
+    for master_col in master_headers:
+        norm_master = normalize_header_name(master_col)
+
+        if norm_master in src_lookup:
+            output_df[master_col] = refined_df[src_lookup[norm_master]]
+            continue
+
+        matched = False
+        for _, aliases in alias_candidates.items():
+            if norm_master in aliases:
+                for alias in aliases:
+                    if alias in src_lookup:
+                        output_df[master_col] = refined_df[src_lookup[alias]]
+                        matched = True
+                        break
+            if matched:
+                break
+
+        if not matched:
+            output_df[master_col] = None
+
+    return output_df
+
+
+def clear_sheet_data_keep_header(ws):
+    if ws.max_row > 1:
+        ws.delete_rows(2, ws.max_row - 1)
+
+
+def copy_row_style(ws, source_row=2, target_row=2, max_col=None):
+    if max_col is None:
+        max_col = ws.max_column
+
+    for col in range(1, max_col + 1):
+        source_cell = ws.cell(row=source_row, column=col)
+        target_cell = ws.cell(row=target_row, column=col)
+
+        if source_cell.has_style:
+            target_cell._style = copy(source_cell._style)
+
+        target_cell.number_format = copy(source_cell.number_format)
+        target_cell.font = copy(source_cell.font)
+        target_cell.fill = copy(source_cell.fill)
+        target_cell.border = copy(source_cell.border)
+        target_cell.alignment = copy(source_cell.alignment)
+        target_cell.protection = copy(source_cell.protection)
+
+
+def write_dataframe_to_master_sheet(ws, final_df):
+    max_col = len(final_df.columns)
+    has_template_style_row = ws.max_row >= 2
+
+    for r_idx, row in enumerate(final_df.itertuples(index=False), start=2):
+        if has_template_style_row and r_idx > 2:
+            copy_row_style(ws, source_row=2, target_row=r_idx, max_col=max_col)
+
+        for c_idx, value in enumerate(row, start=1):
+            cell = ws.cell(row=r_idx, column=c_idx)
+
+            if pd.isna(value):
+                cell.value = None
+            elif isinstance(value, pd.Timestamp):
+                cell.value = value.to_pydatetime()
+            else:
+                cell.value = value
+
+
+def apply_clean_data_table(ws):
+    if ws.max_row < 2 or ws.max_column < 1:
+        return
+
+    if "TblCleanData" in ws.tables:
+        del ws.tables["TblCleanData"]
+
+    table_ref = f"A1:{get_column_letter(ws.max_column)}{max(ws.max_row, 2)}"
+    tab = Table(displayName="TblCleanData", ref=table_ref)
+    tab.tableStyleInfo = TableStyleInfo(
+        name="TableStyleMedium2",
+        showFirstColumn=False,
+        showLastColumn=False,
+        showRowStripes=True,
+        showColumnStripes=False
+    )
+    ws.add_table(tab)
+
+
+def refresh_excel_tables(ws):
+    if not ws.tables:
+        return
+    table_names = list(ws.tables.keys())
+    for table_name in table_names:
+        if table_name == "TblCleanData":
+            continue
+        tab = ws.tables[table_name]
+        tab.ref = f"A1:{get_column_letter(ws.max_column)}{max(ws.max_row, 1)}"
+
+
+def set_workbook_calc_flags(wb):
+    try:
+        wb.calculation.fullCalcOnLoad = True
+        wb.calculation.forceFullCalc = True
+        wb.calculation.calcMode = "auto"
+    except Exception:
+        pass
+
+
+def build_master_template_report(filtered_long, source_file_name):
+    if filtered_long.empty:
+        return b"", pd.DataFrame(), "", []
+
+    refined_df = build_refined_output_df(filtered_long)
+
+    master_path = find_master_template()
+    wb = load_workbook(master_path)
+    ws = get_sheet_case_insensitive(wb, MASTER_SHEET_NAME)
+
+    master_headers = [cell.value for cell in ws[1] if cell.value is not None]
+    if not master_headers:
+        raise ValueError(f"No headers found in row 1 of sheet '{ws.title}'.")
+
+    final_df = map_to_master_headers(refined_df, master_headers)
+
+    clear_sheet_data_keep_header(ws)
+    write_dataframe_to_master_sheet(ws, final_df)
+    apply_clean_data_table(ws)
+    refresh_excel_tables(ws)
+    set_workbook_calc_flags(wb)
+
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    return output.getvalue(), final_df, master_path.name, master_headers
+
+
 def init_dashboard_state(current_hash, sites, metrics):
     default_metrics = [m for m in ["Wind Speed", "Wind Direction"] if m in metrics]
     if not default_metrics and metrics:
@@ -1407,11 +1670,11 @@ st.markdown("""
         <span class="pill">Instant 15/2 Days</span>
         <span class="pill">Custom Range View</span>
         <span class="pill">Per-Site PDF Reports</span>
+        <span class="pill">Master Template Export</span>
     </div>
 </div>
 """, unsafe_allow_html=True)
 
-# Sidebar
 st.sidebar.markdown("### Data Input")
 uploaded_file = st.sidebar.file_uploader("Upload CSV / Excel", type=["csv", "xlsx", "xls"])
 show_summary_tables = st.sidebar.toggle("Show metric summaries", value=False)
@@ -1749,6 +2012,37 @@ if st.button("Generate Optimized Excel"):
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True
         )
+
+st.markdown("### Generate Master Template Excel")
+
+if st.button("Generate Master Template Excel"):
+    if filtered_long.empty:
+        st.warning("No filtered data available to export into the master template.")
+    else:
+        try:
+            with st.spinner("Populating master template workbook..."):
+                master_bytes, master_preview_df, master_filename, master_headers = build_master_template_report(
+                    filtered_long=filtered_long,
+                    source_file_name=uploaded_file.name
+                )
+
+            st.success(f"Master workbook '{master_filename}' populated successfully into sheet '{MASTER_SHEET_NAME}'.")
+
+            with st.expander("Preview mapped master data", expanded=False):
+                st.write(master_headers)
+                st.dataframe(master_preview_df, use_container_width=True, hide_index=True)
+
+            master_output_name = f"Updated_MASTER_{datetime.now().strftime('%Y%m%d%H%M%S')}.xlsx"
+            st.download_button(
+                label="Download Updated Master Workbook",
+                data=master_bytes,
+                file_name=master_output_name,
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True
+            )
+
+        except Exception as e:
+            st.error(f"Master template export failed: {e}")
 
 generated_site_pdfs = st.session_state.get("generated_site_pdfs", [])
 
