@@ -908,26 +908,26 @@ def build_combined_chart(df, site_name, scale_mode, chart_id=None, title_suffix=
     full_title = f"{site_name} | {title_suffix}" if title_suffix else site_name
 
     fig.update_layout(
-        title=full_title,
-        template="plotly_white",
-        height=455,
-        margin=dict(l=10, r=10, t=35, b=60),
-        legend=dict(
-            orientation="h",
-            yanchor="top",
-            y=-0.18,
-            xanchor="center",
-            x=0.5,
-            bgcolor="rgba(255,255,255,0.0)",
-            font=dict(size=11)
-        ),
-        legend_title="",
-        hovermode="x unified",
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="#FFFFFF",
-        uirevision=chart_id or f"{site_name}_{scale_mode}",
-        font=dict(color="#172B4D")
-    )
+    title=full_title,
+    template="plotly_white",
+    height=520,
+    margin=dict(l=10, r=10, t=35, b=110),
+    legend=dict(
+        orientation="h",
+        yanchor="top",
+        y=-0.22,
+        xanchor="center",
+        x=0.5,
+        bgcolor="rgba(255,255,255,0.0)",
+        font=dict(size=10)
+    ),
+    legend_title="",
+    hovermode="x unified",
+    paper_bgcolor="rgba(0,0,0,0)",
+    plot_bgcolor="#FFFFFF",
+    uirevision=chart_id or f"{site_name}_{scale_mode}",
+    font=dict(color="#172B4D")
+)
 
     fig.update_xaxes(
         title="Timestamp",
@@ -1018,7 +1018,12 @@ def add_chart_page(pdf, page_title, image_path, source_file_name, selected_metri
     pdf.cell(0, 5, f"Scale mode: {scale_mode}", ln=True)
     pdf.cell(0, 5, f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", ln=True)
     pdf.ln(3)
-    pdf.image(str(image_path), x=10, y=pdf.get_y(), w=190)
+
+    image_y = pdf.get_y()
+    image_w = 190
+    image_h = 107
+    pdf.image(str(image_path), x=10, y=image_y, w=image_w)
+    return image_y + image_h
 
 
 def add_no_data_page(pdf, page_title, source_file_name, selected_metrics, scale_mode):
@@ -1074,7 +1079,7 @@ def build_site_pdf_report_bytes(site_name, site_df, selected_metrics, scale_mode
         pdf.set_auto_page_break(auto=True, margin=10)
 
         if img_15_path.exists():
-            add_chart_page(
+            chart_bottom_y = add_chart_page(
                 pdf=pdf,
                 page_title=f"{site_name} - Last 15 Days",
                 image_path=img_15_path,
@@ -1082,7 +1087,7 @@ def build_site_pdf_report_bytes(site_name, site_df, selected_metrics, scale_mode
                 selected_metrics=selected_metrics,
                 scale_mode=scale_mode
             )
-            pdf.set_y(145)
+            pdf.set_y(chart_bottom_y + 6)
             add_installation_insight_block(pdf, chart_15_df)
         else:
             add_no_data_page(
@@ -1094,7 +1099,7 @@ def build_site_pdf_report_bytes(site_name, site_df, selected_metrics, scale_mode
             )
 
         if img_2_path.exists():
-            add_chart_page(
+            chart_bottom_y = add_chart_page(
                 pdf=pdf,
                 page_title=f"{site_name} - Last 2 Days",
                 image_path=img_2_path,
@@ -1102,7 +1107,7 @@ def build_site_pdf_report_bytes(site_name, site_df, selected_metrics, scale_mode
                 selected_metrics=selected_metrics,
                 scale_mode=scale_mode
             )
-            pdf.set_y(145)
+            pdf.set_y(chart_bottom_y + 6)
             add_installation_insight_block(pdf, chart_2_df)
         else:
             add_no_data_page(
