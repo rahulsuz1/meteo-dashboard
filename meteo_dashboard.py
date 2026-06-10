@@ -319,6 +319,37 @@ COLOR_MAP = {
 # =========================================================
 # HELPERS
 # =========================================================
+
+
+def apply_clean_data_table(ws):
+    if ws.max_row < 2 or ws.max_column < 1:
+        return
+
+    existing_table_names = list(ws.tables.keys())
+    for table_name in existing_table_names:
+        if table_name == "TblCleanData":
+            del ws.tables[table_name]
+
+    table_ref = f"A1:{get_column_letter(ws.max_column)}{ws.max_row}"
+    tab = Table(displayName="TblCleanData", ref=table_ref)
+    tab.tableStyleInfo = TableStyleInfo(
+        name="TableStyleMedium2",
+        showFirstColumn=False,
+        showLastColumn=False,
+        showRowStripes=True,
+        showColumnStripes=False
+    )
+    ws.add_table(tab)
+
+wb = load_workbook(master_template_path)
+clean_ws = wb["Clean Data"]
+
+# clear old rows / write headers / write new data here
+
+apply_clean_data_table(clean_ws)
+
+wb.save(output_path)
+
 def send_reports_email_gmail(to_emails, subject, body, reports):
     sender = st.secrets["EMAIL_SENDER"]
     password = st.secrets["EMAIL_PASSWORD"]
